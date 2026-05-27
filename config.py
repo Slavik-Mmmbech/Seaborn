@@ -1,4 +1,4 @@
-from entities.item import Rarity
+from entities.items import Rarity
 
 # Настройки отображения игрового экрана
 SCREEN_WIDTH = 1024
@@ -44,9 +44,14 @@ SOUND_VOLUME_MASTER = 0.7
 
 # Настройки BSP генерации
 
-MIN_SIZE = 12
+MIN_SIZE = 24
 
 SPLIT_RATIO_MIN = 0.2
 SPLIT_RATIO_MAX = 0.8
 
 RATIO_LIMIT = 1.2
+ROOM_MARGIN = 6
+ROOM_OFFSET = 2
+ROOM_MIN_FILL = 0.3
+
+CORRIDOR_CORNER_PROBABILITY = 0.5
