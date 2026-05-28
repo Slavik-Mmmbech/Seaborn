@@ -61,3 +61,32 @@ CORRIDOR_CORNER_PROBABILITY = 0.5
 
 DEFAULT_GENERATION_LENGTH = 5
 FALLBACK_STATE = "unknown"
+
+# Константы конфигурации NPC
+NPC_MAX_HEALTH = 100
+LORE_CONTEXT_START = "submerged_lab"
+LORE_TEXT_LENGTH = 4
+
+# Тестирование 
+
+COLOR_BG = (30, 30, 40)
+COLOR_BOUNDARY = (60, 60, 70)
+COLOR_OBJECT = (70, 130, 180)
+COLOR_QUERY = (255, 100, 100, 50)  # RGBA
+COLOR_HIT = (255, 215, 0)
+MAX_ENTITIES = 150
+ENTITY_RADIUS = 4
+
+TEXT_COLOR = (255, 255, 255)      # Белый текст
+ACCENT_COLOR = (0, 255, 150)      # Яркий мятный для вкцента
+BORDER_COLOR = (100, 100, 120)    # Серая рамка
+
+FONT_SIZE_HEADER = 28
+FONT_SIZE_SMALL = 18
+FONT_FAMILY = "consolas"
+
+CELL_PADDING = 15
+SEQUENCE_GAP = 12
+LINE_HEIGHT = 30
+
+OUTPUT_FILENAME = "markov_dashboard.png" 
