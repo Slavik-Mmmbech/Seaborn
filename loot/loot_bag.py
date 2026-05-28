@@ -33,7 +33,6 @@ class LootBag:
         
         for i, (rarity, cfg) in enumerate(rarity_sorted):
             if i == len(rarity_sorted) - 1:
-                # Гарантия того, что добавление последней редкости пройдет гладко.
                 count = remaining_slots
             else:
                 count = round(cfg[3] * SHUFFLE_BAG_SIZE)
