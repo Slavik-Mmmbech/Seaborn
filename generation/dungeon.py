@@ -15,7 +15,9 @@ class DungeonGenerator:
     def generate(self) -> Tuple[List[pygame.Rect], List[Tuple[int, int, int, int]]]:
         self.root.recursive_split(self.depth)
         
-        rooms = [pygame.Rect(n.x, n.y, n.width, n.height) for n in self.root.get_leaf_nodes()]
+        room_gen = RoomGenerator()
+        room_gen.create_rooms_in_tree(self.root)
+        rooms = [pygame.Rect(*n.room) for n in self.root.get_leaf_nodes() if n.room]
         corridors = self._build_corridors(self.root)
         return rooms, corridors
 

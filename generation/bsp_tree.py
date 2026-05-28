@@ -4,8 +4,7 @@
 """
 import random
 from typing import List, Optional
-from config import MIN_SIZE, SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, RATIO_LIMIT, ROOM_MARGIN
-
+from config import MIN_SIZE, SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, RATIO_LIMIT
 
 class BSPNode:
     """

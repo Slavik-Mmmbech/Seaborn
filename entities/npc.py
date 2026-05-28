@@ -1,6 +1,5 @@
 from typing import Tuple
-from ai.behavior_tree import Blackboard, BTNode, Sequence, Selector, Condition, Action, NodeStatus
-from ai.markov_chain import MarkovChain
+from ai import Blackboard, BTNode, Sequence, Selector, Condition, Action, MarkovChain
 from config import NPC_MAX_HEALTH, LORE_CONTEXT_START, LORE_TEXT_LENGTH
 
 class NPC:
