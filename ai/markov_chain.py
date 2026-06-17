@@ -30,7 +30,7 @@ class MarkovChain:
             state: Кумулятивная сумма весов
             state_pool: Дочерние узлы
 
-        Выход:
+        Returns:
             self._cum_weights: Ключу состояния присвоен список вероятностей
             self._state_pool: Ключу состояния присвоен список состояний
         """
@@ -53,7 +53,7 @@ class MarkovChain:
         Attributes:
             current: Исходящее состояние
 
-        Выход:
+        Returns:
             pool[idx]: Действие, соответствующее полученному индексу
         """
         if self.transitions[current] == {}:
@@ -76,7 +76,7 @@ class MarkovChain:
             start_state: Исходящее состояние
             length: Длина требуемого списка состояний
 
-        Выход:
+        Returns:
             sequence: Список состояний
         """
         if start_state not in self.transitions:

@@ -2,16 +2,19 @@ from abc import ABC, abstractmethod
 from enum import Enum, auto
 from typing import Any, Dict, List, Callable
 
+
 # Статусы узлов
 class NodeStatus(Enum):
     SUCCESS = auto()
     FAILURE = auto()
     RUNNING = auto()
 
+
 class Blackboard:
     """
     Общее хранилище состояний.
     """
+
     def __init__(self):
         self._data: Dict[str, Any] = {}
 
@@ -27,15 +30,17 @@ class Blackboard:
         """Проверка наличия ключа в словаре"""
         return key in self._data
 
+
 class BTNode(ABC):
     """Базовый класс узла дерева поведения."""
+
     @abstractmethod
     def tick(self, blackboard: Blackboard) -> NodeStatus:
         pass
 
 class Sequence(BTNode):
     """Узел, выполняющий дочерние узлы строго по порядку.
-    
+
     Attributes:
         children: Список узлов
     Returns:
@@ -44,6 +49,7 @@ class Sequence(BTNode):
         При успешном выполнении:
             NodeStatus.SUCCESS
     """
+
     def __init__(self, children: List[BTNode]):
         self.children = children
 
@@ -54,9 +60,10 @@ class Sequence(BTNode):
                 return status  # Остановка при первой ошибке
         return NodeStatus.SUCCESS
 
+
 class Selector(BTNode):
     """Узел, который перебирает варианты, пока не найдет работающий.
-    
+
     Attributes:
         children: Список узлов
     Returns:
@@ -65,6 +72,7 @@ class Selector(BTNode):
         При успешном выполнении:
             status: Состояние дерева поведения в данный момент.
     """
+
     def __init__(self, children: List[BTNode]):
         self.children = children
 
@@ -75,8 +83,9 @@ class Selector(BTNode):
                 return status  # Остановка при первом успехе
         return NodeStatus.FAILURE
 
+
 class Condition(BTNode):
-    """ Узел-проверка наи соотвествие условию
+    """Узел-проверка наи соотвествие условию
 
     Attributes:
         predicate: Функция, передающая состояние проверки
@@ -86,20 +95,23 @@ class Condition(BTNode):
         При выполнении условий:
             NodeStatus.SUCCESS
     """
+
     def __init__(self, predicate: Callable[[Blackboard], bool]):
         self.predicate = predicate
 
     def tick(self, blackboard: Blackboard) -> NodeStatus:
         return NodeStatus.SUCCESS if self.predicate(blackboard) else NodeStatus.FAILURE
 
+
 class Action(BTNode):
     """Узел, выполняющий действие.
-    
+
     Attributes:
         behavior_fn: Функция поведения при инициализации
     Returns:
-        NodeStatus 
+        NodeStatus
     """
+
     def __init__(self, behavior_fn: Callable[[Blackboard], NodeStatus]):
         self.behavior_fn = behavior_fn
 
