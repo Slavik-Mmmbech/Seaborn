@@ -3,7 +3,7 @@ from collections import deque
 from generation.bsp_tree import BSPNode
 from generation.room_generator import RoomGenerator
 from generation.corridor_generator import CorridorGenerator
-from config import SCREEN_WIDTH, SCREEN_HEIGHT
+from config.display_config import SCREEN_WIDTH, SCREEN_HEIGHT
 
 class TestDungeonIntegration:
     """Интеграционные тесты полного пайплайна генерации подземелья."""

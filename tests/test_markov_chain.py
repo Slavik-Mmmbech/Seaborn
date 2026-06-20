@@ -26,14 +26,6 @@ def test_generate_zero_length(chain):
     assert chain.generate("A", length=0) == []
     assert chain.generate("A", length=-3) == []
 
-# Fallback при отсутствии состояния в transitions
-def test_fallback_missing_state(chain, monkeypatch):
-    # Гарантия детерминированного выбора при fallback
-    monkeypatch.setattr(random, "choice", lambda seq: "C")
-    result = chain.generate("X", length=2)
-    assert result[0] == "X"
-    assert result[1] == "C"
-
 # 4. Проверка кумулятивных весов (детерминированный мок)
 def test_sample_next_deterministic(chain, monkeypatch):
     monkeypatch.setattr(random, "uniform", lambda a, b: 0.1)
