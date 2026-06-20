@@ -39,3 +39,7 @@ LORE_VOCABULARY = {
     "warning": "Вам здесь не рады.",
     "unknown": "[Нераспознанный сигнал]"
 }
+
+_UNIFORM_MIN = 0.0
+_SEQUENCE_START_INDEX = 1
+_EMPTY_TRANSITIONS = {} 
