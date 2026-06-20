@@ -1,5 +1,6 @@
 import pygame
-import config as settings
+import config.display_config as display
+import config.gameplay_config as gameplay
 from core.world import World
 
 
@@ -7,7 +8,7 @@ class Game:
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode(
-            (settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT)
+            (display.SCREEN_WIDTH, display.SCREEN_HEIGHT)
         )
         pygame.display.set_caption("Seaborn")
         self.clock = pygame.time.Clock()
@@ -29,7 +30,7 @@ class Game:
 
     def run(self):
         while self.running:
-            self.clock.tick(settings.FPS)
+            self.clock.tick(display.FPS)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -75,7 +76,7 @@ class Game:
                                     if self.world.player:
                                         self.world.player.oxygen = min(
                                             self.world.player.oxygen + 25,
-                                            settings.PLAYER_MAX_OXYGEN,
+                                            gameplay.PLAYER_MAX_OXYGEN,
                                         )
                                     self.world.talk_text = f"⭐ {lore_text}\n\n\n\n [ДРЕВНИЙ ДУХ ДАРУЕТ BОЗДУХ! +25 O₂]"
                                 elif reward == "rare_lore":
@@ -104,12 +105,12 @@ class Game:
                 if self.world.level_complete:
                     self.levels_completed += 1
                     self.world.level_complete = False
-                    if self.levels_completed >= settings.LEVEL_COUNT_TO_COMPLETE:
+                    if self.levels_completed >= gameplay.LEVEL_COUNT_TO_COMPLETE:
                         self.show_end_screen = True
                     else:
                         self.world.generate()
 
-            self.screen.fill(settings.WATER_COLOR)
+            self.screen.fill(display.WATER_COLOR)
             if not self.show_menu:
                 self.world.draw(self.screen)
             self.draw_ui(self.screen)
@@ -119,13 +120,13 @@ class Game:
 
     def _draw_collected_items(self, screen, player, small_font, x_pos, y_offset):
         """Helper method to display collected items with rarity colors"""
-        rarity_colors = settings.RARITY_COLORS
+        rarity_colors = display.RARITY_COLORS
 
         if not hasattr(player, "inventory") or not player.inventory:
             return y_offset
 
         for item in player.inventory[:5]:
-            rarity_color = rarity_colors.get(item.rarity, settings.BASE_COLOR)
+            rarity_color = rarity_colors.get(item.rarity, display.BASE_COLOR)
             item_text = small_font.render(
                 f"• {item.name} ({item.rarity.value})", True, rarity_color
             )
@@ -159,7 +160,7 @@ class Game:
 
         if self.world.player:
             oxygen = self.world.player.oxygen
-            oxygen_color = settings.BASE_COLOR if oxygen > 30 else (255, 100, 0)
+            oxygen_color = display.BASE_COLOR if oxygen > 30 else (255, 100, 0)
             oxygen_text = font.render(f"Кислород: {int(oxygen)}", True, oxygen_color)
             screen.blit(oxygen_text, (10, 10))
 
@@ -167,15 +168,15 @@ class Game:
                 inv_count_text = small_font.render(
                     f"Items: {len(self.world.player.inventory)} (Weight: {self.world.player.current_weight:.1f}/{self.world.player.max_weight})",
                     True,
-                    settings.BASE_COLOR,
+                    display.BASE_COLOR,
                 )
                 screen.blit(inv_count_text, (10, 50))
 
                 y_offset = 70
 
                 for item in self.world.player.inventory:
-                    rarity_color = settings.RARITY_COLORS.get(
-                        item.rarity, settings.BASE_COLOR
+                    rarity_color = display.RARITY_COLORS.get(
+                        item.rarity, display.BASE_COLOR
                     )
                     item_text = small_font.render(
                         f"• {item.name} ({item.rarity.value})", True, rarity_color
@@ -183,7 +184,7 @@ class Game:
                     screen.blit(item_text, (10, y_offset))
                     y_offset += 22
 
-                    if y_offset > settings.SCREEN_HEIGHT // 2:
+                    if y_offset > display.SCREEN_HEIGHT // 2:
                         remaining = (
                             len(self.world.player.inventory) - (y_offset - 70) // 22
                         )
@@ -201,7 +202,7 @@ class Game:
                 self.world.notification_message, True, (255, 100, 100)
             )
             notification_rect = notification_text.get_rect(
-                center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 - 100)
+                center=(display.SCREEN_WIDTH // 2, display.SCREEN_HEIGHT // 2 - 100)
             )
             screen.blit(notification_text, notification_rect)
 
@@ -212,7 +213,7 @@ class Game:
                 "Нажмите R: Завершить уровень?", True, (100, 255, 100)
             )
             exit_rect = exit_text.get_rect(
-                center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT - 100)
+                center=(display.SCREEN_WIDTH // 2, display.SCREEN_HEIGHT - 100)
             )
             pygame.draw.rect(screen, (50, 100, 50), exit_rect.inflate(20, 10))
             pygame.draw.rect(screen, (100, 255, 100), exit_rect.inflate(20, 10), 2)
@@ -227,16 +228,16 @@ class Game:
         ]
         for i, hint in enumerate(hints):
             text = small_font.render(hint, True, (200, 200, 200))
-            screen.blit(text, (settings.SCREEN_WIDTH - 220, 10 + i * 20))
+            screen.blit(text, (display.SCREEN_WIDTH - 220, 10 + i * 20))
 
         if self.world.active_storyteller and self.world.talk_text:
             talk_box = pygame.Rect(
-                70, settings.SCREEN_HEIGHT - 160, settings.SCREEN_WIDTH - 140, 120
+                70, display.SCREEN_HEIGHT - 160, display.SCREEN_WIDTH - 140, 120
             )
             pygame.draw.rect(screen, (0, 0, 0), talk_box)
-            pygame.draw.rect(screen, settings.BASE_COLOR, talk_box, 2)
+            pygame.draw.rect(screen, display.BASE_COLOR, talk_box, 2)
             rendered = small_font.render(
-                "Нажмите SPACE или E чтобы закрыть", True, settings.BASE_COLOR
+                "Нажмите SPACE или E чтобы закрыть", True, display.BASE_COLOR
             )
             screen.blit(rendered, (talk_box.x + 10, talk_box.y + 10))
             self._render_wrapped_text(
@@ -253,13 +254,13 @@ class Game:
             )
         elif self.world.storyteller_in_range:
             prompt = small_font.render(
-                "Нажмите E чтобы говорить с storyteller", True, settings.BASE_COLOR
+                "Нажмите E чтобы говорить с storyteller", True, display.BASE_COLOR
             )
             screen.blit(
                 prompt,
                 (
-                    settings.SCREEN_WIDTH // 2 - prompt.get_width() // 2,
-                    settings.SCREEN_HEIGHT - 60,
+                    display.SCREEN_WIDTH // 2 - prompt.get_width() // 2,
+                    display.SCREEN_HEIGHT - 60,
                 ),
             )
 
@@ -292,65 +293,65 @@ class Game:
                 break
 
     def _draw_menu(self, screen, font, small_font):
-        overlay = pygame.Surface((settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT))
-        overlay.fill(settings.MENU_BACKGROUND)
+        overlay = pygame.Surface((display.SCREEN_WIDTH, display.SCREEN_HEIGHT))
+        overlay.fill(display.MENU_BACKGROUND)
         screen.blit(overlay, (0, 0))
-        title = font.render("Seaborn: Explore and collect", True, settings.BASE_COLOR)
-        screen.blit(title, (settings.SCREEN_WIDTH // 2 - title.get_width() // 2, 140))
+        title = font.render("Seaborn: Explore and collect", True, display.BASE_COLOR)
+        screen.blit(title, (display.SCREEN_WIDTH // 2 - title.get_width() // 2, 140))
         start = small_font.render(
             "Нажмите любую клавишу чтобы начать.", True, (200, 200, 200)
         )
-        screen.blit(start, (settings.SCREEN_WIDTH // 2 - start.get_width() // 2, 220))
+        screen.blit(start, (display.SCREEN_WIDTH // 2 - start.get_width() // 2, 220))
 
     def _draw_pause_overlay(self, screen, font, small_font):
         overlay = pygame.Surface(
-            (settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT), pygame.SRCALPHA
+            (display.SCREEN_WIDTH, display.SCREEN_HEIGHT), pygame.SRCALPHA
         )
-        overlay.fill(settings.PAUSE_OVERLAY)
+        overlay.fill(display.PAUSE_OVERLAY)
         screen.blit(overlay, (0, 0))
-        paused_text = font.render("Пауза", True, settings.BASE_COLOR)
+        paused_text = font.render("Пауза", True, display.BASE_COLOR)
         resume_text = small_font.render(
             "Нажмите ESC чтобы продолжить", True, (200, 200, 200)
         )
         screen.blit(
             paused_text,
             (
-                settings.SCREEN_WIDTH // 2 - paused_text.get_width() // 2,
-                settings.SCREEN_HEIGHT // 2 - 20,
+                display.SCREEN_WIDTH // 2 - paused_text.get_width() // 2,
+                display.SCREEN_HEIGHT // 2 - 20,
             ),
         )
         screen.blit(
             resume_text,
             (
-                settings.SCREEN_WIDTH // 2 - resume_text.get_width() // 2,
-                settings.SCREEN_HEIGHT // 2 + 20,
+                display.SCREEN_WIDTH // 2 - resume_text.get_width() // 2,
+                display.SCREEN_HEIGHT // 2 + 20,
             ),
         )
 
     def _draw_end_screen(self, screen, font, small_font):
-        overlay = pygame.Surface((settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT))
-        overlay.fill(settings.MENU_BACKGROUND)
+        overlay = pygame.Surface((display.SCREEN_WIDTH, display.SCREEN_HEIGHT))
+        overlay.fill(display.MENU_BACKGROUND)
         screen.blit(overlay, (0, 0))
         if self.world.player and self.world.player.oxygen <= 0:
             line = "Out of oxygen!"
         else:
             line = "Супер! Попробовать еще раз?"
-        end_text = font.render(line, True, settings.BASE_COLOR)
+        end_text = font.render(line, True, display.BASE_COLOR)
         action_text = small_font.render(
             "Нажмите R чтобы регенерировать или ESC чтобы  остановить",
             True,
             (200, 200, 200),
         )
         screen.blit(
-            end_text, (settings.SCREEN_WIDTH // 2 - end_text.get_width() // 2, 220)
+            end_text, (display.SCREEN_WIDTH // 2 - end_text.get_width() // 2, 220)
         )
         screen.blit(
-            action_text, (settings.SCREEN_WIDTH // 2 - action_text.get_width() // 2, 280)
+            action_text, (display.SCREEN_WIDTH // 2 - action_text.get_width() // 2, 280)
         )
 
         if self.world.player:
             oxygen_color = (
-                settings.BASE_COLOR if self.world.player.oxygen > 30 else (255, 100, 0)
+                display.BASE_COLOR if self.world.player.oxygen > 30 else (255, 100, 0)
             )
             oxygen_text = font.render(
                 f"Кислород: {int(self.world.player.oxygen)}", True, oxygen_color
@@ -362,7 +363,7 @@ class Game:
                 inv_header = small_font.render(
                     f"Собранные предметы: ({len(self.world.player.inventory)}):",
                     True,
-                    settings.BASE_COLOR,
+                    display.BASE_COLOR,
                 )
                 screen.blit(inv_header, (10, y_pos))
                 y_pos = self._draw_collected_items(
@@ -372,4 +373,4 @@ class Game:
         hints = ["R - Рестарт", "ESC - Пауза"]
         for i, hint in enumerate(hints):
             text = small_font.render(hint, True, (200, 200, 200))
-            screen.blit(text, (settings.SCREEN_WIDTH - 220, 10 + i * 20))
+            screen.blit(text, (display.SCREEN_WIDTH - 220, 10 + i * 20))

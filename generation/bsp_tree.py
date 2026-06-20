@@ -4,7 +4,7 @@
 """
 import random
 from typing import List, Optional
-from config import MIN_SIZE, SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, RATIO_LIMIT
+from config.generation_config import MIN_SIZE, SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, RATIO_LIMIT
 
 class BSPNode:
     """
@@ -19,7 +19,6 @@ class BSPNode:
     def __init__(self, x: int, y: int, width: int, height: int):
         self.x: int = x
         self.y: int = y
-
         self.width: int = width
         self.height: int = height
 
@@ -61,10 +60,22 @@ class BSPNode:
             return random.choice([True, False])
         
     def _calculate_split_position(self, horizontal: bool) -> int:
-        """Вычисляет позицию разбиения."""
+        """Вычисляет позицию разбиения с безопасными границами.
+
+        Гарантируем, что возвращаемая позиция лежит в диапазоне [1, size-1].
+        При некорректных расчетах возвращаем середину области в качестве
+        безопасного фоллбэка.
+        """
         size = self.height if horizontal else self.width
-        min_split = int(size * SPLIT_RATIO_MIN)
-        max_split = int(size * SPLIT_RATIO_MAX)
+        if size <= 2:
+            return size // 2
+
+        min_split = max(1, int(size * SPLIT_RATIO_MIN))
+        max_split = min(size - 1, int(size * SPLIT_RATIO_MAX))
+
+        if min_split > max_split:
+            return size // 2
+
         return random.randint(min_split, max_split)
     
     def _create_horizontal_split(self, split_pos: int) -> None:
@@ -117,3 +128,6 @@ class BSPNode:
             self.x + self.width // 2,
             self.y + self.height // 2
         )    
+
+    def __repr__(self):
+        return f"BSP TREE(CORDS:{self.x}/{self.y}, SIDES:{self.height}/{self.width})"

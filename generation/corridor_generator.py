@@ -5,7 +5,7 @@ import random
 from typing import List, Tuple
 from generation.bsp_tree import BSPNode
 from generation.room_generator import RoomGenerator
-from config import CORRIDOR_CORNER_PROBABILITY
+from config.generation_config import CORRIDOR_CORNER_PROBABILITY
 
 class CorridorGenerator:
     """

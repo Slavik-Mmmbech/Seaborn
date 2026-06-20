@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import List, Tuple, Any, Optional
 
+from config.generation_config import MAX_CAPACITY, MAX_DEPTH
+
 @dataclass
 class Bounds:
     """Прямоугольная область пространства. Используется для гео-запросов."""
@@ -24,13 +26,19 @@ class QuadTree:
     """
     Иерархическое разбиение 2D-пространства.
     """
-    MAX_CAPACITY: int = 4
-    MAX_DEPTH: int = 5
+    MAX_CAPACITY = MAX_CAPACITY
+    MAX_DEPTH = MAX_DEPTH
 
-    def __init__(self, bounds: Bounds, depth: int = 0):
+    def __init__(self, bounds: Bounds,
+                 depth: int = 0,
+                 max_capacity: int = MAX_CAPACITY,
+                 max_depth: int = MAX_DEPTH
+                 ):
         self.bounds = bounds
         self.depth = depth
         self.items: List[Tuple[Any, Bounds]] = []
+        self.max_capacity = max_capacity
+        self.max_depth = max_depth
         self.children: List[Optional['QuadTree']] = [None, None, None, None]
 
     def insert(self, item: Any, item_bounds: Bounds) -> bool:
@@ -43,11 +51,14 @@ class QuadTree:
             for child in self.children:
                 if child.insert(item, item_bounds):
                     return True
-            return False
+            # Если объект не помещается полностью в дочерние квадранты,
+            # храним его в текущем узле вместо отбрасывания.
+            self.items.append((item, item_bounds))
+            return True
 
         self.items.append((item, item_bounds))
         # Превышение ёмкости → рекурсивное разбиение
-        if len(self.items) > self.MAX_CAPACITY and self.depth < self.MAX_DEPTH:
+        if len(self.items) > self.max_capacity and self.depth < self.max_depth:
             self._subdivide()
         return True
 
@@ -80,10 +91,19 @@ class QuadTree:
         self.children[3] = QuadTree(Bounds(x + w_half, y + h_half, w_half, h_half), self.depth + 1)
 
         # Переносим существующие объекты в дочерние узлы
+        remaining: List[Tuple[Any, Bounds]] = []
         for item, item_bounds in self.items:
+            placed = False
             for child in self.children:
-                child.insert(item, item_bounds)
-        self.items.clear()
+                if child.bounds.contains(item_bounds):
+                    child.insert(item, item_bounds)
+                    placed = True
+                    break
+            if not placed:
+                # Оставляем объекты, которые не умещаются полностью ни в одном дочернем квадранте
+                remaining.append((item, item_bounds))
+
+        self.items = remaining
 
     def clear(self) -> None:
         """Сброс дерева. Вызывается каждый кадр при обновлении позиций сущностей."""

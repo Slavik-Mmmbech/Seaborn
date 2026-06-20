@@ -2,8 +2,8 @@ import math
 from entities.items import Rarity
 
 # Настройки отображения игрового экрана
-SCREEN_WIDTH = 1324
-SCREEN_HEIGHT = 668
+SCREEN_WIDTH = 1024
+SCREEN_HEIGHT = 568
 FPS = 60
 TILE_SIZE = 32
 

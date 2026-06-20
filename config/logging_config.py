@@ -1,7 +1,7 @@
 import logging
 import sys
 
-def setup_logger(name=None, level=logging.INFO):
+def setup_logger(name=None, level=logging.DEBUG):
     """Конфигурация логгера"""
     logger = logging.getLogger(name)
     

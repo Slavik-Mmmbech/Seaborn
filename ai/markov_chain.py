@@ -2,8 +2,8 @@ import random
 from bisect import bisect_left
 from typing import Dict, List
 
-from config import DEFAULT_GENERATION_LENGTH
-from logging_config import setup_logger
+from config.content_config import DEFAULT_GENERATION_LENGTH, LORE_CONTEXT_START
+from config.logging_config import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -13,10 +13,9 @@ class MarkovChain:
     Цепь Маркова для генерации.
     """
 
-    def __init__(self, transitions: Dict[str, Dict[str, float]], logger=logger):
+    def __init__(self, transitions: Dict[str, Dict[str, float]]):
         self.transitions = transitions
         self._cum_weights: Dict[str, List[float]] = {}
-        self.logger = logger
         self._state_pool: Dict[str, List[str]] = {}
         self._precompute()
 
@@ -57,7 +56,7 @@ class MarkovChain:
             pool[idx]: Действие, соответствующее полученному индексу
         """
         if self.transitions[current] == {}:
-            self.logger.error(f"Проблема: {current} не имеет состояний -> fallback")
+            logger.debug(f"Проблема: {current} не имеет состояний -> fallback")
             return random.choice(list(self.transitions.keys()))
 
         cum = self._cum_weights[current]
@@ -68,8 +67,10 @@ class MarkovChain:
         return pool[idx]
 
     def generate(
-        self, start_state: str, length: int = DEFAULT_GENERATION_LENGTH
-    ) -> List[str]:
+        self,
+        start_state: str = LORE_CONTEXT_START,
+        length: int = DEFAULT_GENERATION_LENGTH
+        ) -> List[str]:
         """Генерирует цепочку состояний.
 
         Attributes:
@@ -79,10 +80,6 @@ class MarkovChain:
         Returns:
             sequence: Список состояний
         """
-        if start_state not in self.transitions:
-            self.logger.error(f"Проблема: {start_state} не существует -> fallback")
-            start_state = list(self.transitions.keys())[0]
-
         if length <= 0:
             return []
 

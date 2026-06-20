@@ -4,7 +4,7 @@
 """
 import random
 from generation.bsp_tree import BSPNode
-from config import ROOM_MARGIN, ROOM_OFFSET, ROOM_MIN_FILL
+from config.generation_config import ROOM_MARGIN, ROOM_OFFSET, ROOM_MIN_FILL
 from typing import Optional, Tuple
 
 class RoomGenerator:
@@ -44,24 +44,36 @@ class RoomGenerator:
 
     def _create_room_in_node(self, node: BSPNode) -> None:
         """Создает комнату в одном узле."""
-        room_width = random.randint(
-            int(node.width * self.min_fill_ratio),
-            node.width - ROOM_MARGIN
-        )
-        room_height = random.randint(
-            int(node.height * self.min_fill_ratio),
-            node.height - ROOM_MARGIN
-        )
-        
-        room_x = random.randint(
-            node.x + ROOM_OFFSET,
-            node.x + node.width - room_width - ROOM_OFFSET
-        )
-        room_y = random.randint(
-            node.y + ROOM_OFFSET,
-            node.y + node.height - room_height - ROOM_OFFSET
-        )
-        
+        # Width/height: ensure min/max are valid integers
+        min_w = max(1, int(node.width * self.min_fill_ratio))
+        max_w = max(min_w, node.width - ROOM_MARGIN)
+        if max_w <= min_w:
+            room_width = min_w
+        else:
+            room_width = random.randint(min_w, max_w)
+
+        min_h = max(1, int(node.height * self.min_fill_ratio))
+        max_h = max(min_h, node.height - ROOM_MARGIN)
+        if max_h <= min_h:
+            room_height = min_h
+        else:
+            room_height = random.randint(min_h, max_h)
+
+        # Position: if there is no space for randomness, fall back to the minimum offset
+        min_x = node.x + ROOM_OFFSET
+        max_x = node.x + node.width - room_width - ROOM_OFFSET
+        if max_x <= min_x:
+            room_x = min_x
+        else:
+            room_x = random.randint(min_x, max_x)
+
+        min_y = node.y + ROOM_OFFSET
+        max_y = node.y + node.height - room_height - ROOM_OFFSET
+        if max_y <= min_y:
+            room_y = min_y
+        else:
+            room_y = random.randint(min_y, max_y)
+
         node.room = (room_x, room_y, room_width, room_height)
 
     def get_room_closest_to(self, node: BSPNode,  target_x: int, target_y: int) -> Optional[Tuple[int, int, int, int]]:

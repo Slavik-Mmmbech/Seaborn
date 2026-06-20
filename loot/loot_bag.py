@@ -4,8 +4,7 @@
 Обеспечивает контролируемое случайное распределение предметов.
 """
 import random
-from typing import Generator
-from config import ITEM_RARITY_CONFIG, SHUFFLE_BAG_SIZE
+from config.gameplay_config import ITEM_RARITY_CONFIG, SHUFFLE_BAG_SIZE
 from entities.items import Rarity
 
 class LootBag:
@@ -53,6 +52,6 @@ class LootBag:
             self._refill()
         return self._bag.pop()
 
-    def __iter__(self) -> Generator[Rarity, None, None]:
-        """Позволяет использовать LootBag в цикле или с next()."""
-        return self # type: ignore
+    # def __iter__(self) -> Generator[Rarity, None, None]:
+    #     """Позволяет использовать LootBag в цикле или с next()."""
+    #     return self
