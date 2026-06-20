@@ -33,16 +33,11 @@ from config.content_config import (
     GAME_TRANSITIONS,
 )
 from config.logging_config import setup_logger
+from config.enums import NPCType
 from loot.weighted_binary import WeightedBinaryLootGenerator as WBLGen
 
 
 logger = setup_logger(__name__)
-
-class NPCType(Enum):
-    ATTACKER = "attacker"
-    ESCAPER = "escaper"
-    STORYTELLER = "storyteller"
-
 
 class NPC:
     """Игровой NPC. Использует BT для логики и цепь Маркова для нарратива."""
@@ -150,29 +145,6 @@ class NPC:
         reward = self.generate_dialog_reward()
         return lore_text, reward
 
-    def draw(self, surface: pygame.Surface) -> None:
-        """Отрисовка объекта NPC"""
-        color_map = {
-            NPCType.ATTACKER: (220, 80, 80),
-            NPCType.ESCAPER: (80, 180, 220),
-            NPCType.STORYTELLER: (190, 190, 90),
-        }
-        npc_color = color_map.get(self.npc_type, (220, 80, 80))
-        pygame.draw.circle(surface, npc_color, self.rect.center, self.radius)
-
-        label = pygame.font.Font(None, NPC_LABEL_FONT_SIZE).render(
-            self.id, True, (235, 235, 235)
-        )
-        surface.blit(
-            label, (self.rect.centerx - label.get_width() // 2, self.rect.top - 18)
-        )
-        if self.npc_type == NPCType.STORYTELLER:
-            mark = pygame.font.Font(None, 18).render("?", True, (255, 255, 255))
-            surface.blit(
-                mark,
-                (self.rect.centerx - mark.get_width() // 2, self.rect.centery - mark.get_height() // 2),
-            )
-
     def move_to(
         self, target: Tuple[float, float], max_step: float | None = None
     ) -> None:
@@ -226,42 +198,3 @@ class NPC:
 
     def __repr__(self) -> str:
         return f"NPC(ID:{self.id}, TYPE:{self.npc_type.value})"
-
-
-if __name__ == "__main__":
-    # 1. Конфигурация цепи Маркова
-    lore_transitions = GAME_TRANSITIONS
-    lore_chain = MarkovChain(lore_transitions)
-
-    # 2. Сборка дерева поведения
-    def check_sees_player(bb: Blackboard) -> bool:
-        return bb.get("sees_player") is True
-
-    def move_to_patrol(bb: Blackboard) -> NodeStatus:
-        # Имитация действия: обновляет позицию, пишет в лог
-        bb.set("action_log", bb.get("action_log") + ["patrolling"])
-        return NodeStatus.SUCCESS
-
-    def chase_player(bb: Blackboard) -> NodeStatus:
-        bb.set("action_log", bb.get("action_log") + ["chasing"])
-        return NodeStatus.RUNNING  # Может занять несколько кадров
-
-    root_bt = Selector(
-        [
-            Sequence([Condition(check_sees_player), Action(chase_player)]),
-            Action(move_to_patrol),
-        ]
-    )
-
-    # 3. Создание NPC
-    npc = NPC(
-        npc_id="deep_drone_01",
-        start_pos=(10.0, -5.0),
-        bt_root=root_bt,
-        lore_chain=lore_chain,
-    )
-
-    # 4. Демонстрация работы
-    print("Лор:", npc.speak_lore())
-    npc.update(delta_time=NPC_DELTA_TIME)
-    print("Лог действий:", npc.blackboard.get("action_log"))
