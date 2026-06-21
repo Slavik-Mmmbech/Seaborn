@@ -114,26 +114,6 @@ class DungeonRenderer:
         for wall in walls:
             pygame.draw.rect(screen, display.WALL_COLOR, wall)
     
-    def draw_debug_info(
-        self, 
-        screen: pygame.Surface, 
-        rooms: List[Tuple[int, int, int, int]],
-        corridors: List[Tuple[int, int, int, int]],
-        collected_items: int = 0
-    ) -> None:
-        """Отрисовывает отладочную информацию."""
-        font = pygame.font.Font(None, 28)
-        info_lines = [
-            f"Rooms: {len(rooms)}",
-            f"Corridors: {len(corridors)}",
-            f"Collected: {collected_items}",
-            f"Press R - Regenerate",
-        ]
-        
-        for i, text in enumerate(info_lines):
-            rendered = font.render(text, True, display.BASE_COLOR)
-            screen.blit(rendered, (10, 10 + i * 30))
-    
     def _get_room_color(self, index: int) -> Tuple[int, int, int]:
         """Генерирует цвет комнаты на основе индекса."""
         return (

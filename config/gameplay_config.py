@@ -1,9 +1,14 @@
 import math
 from config.enums import Rarity
 
-LIGHT_RADIUS_BASE = 120
 # Настройки Lightmap + Raycasting
+LIGHT_RADIUS_BASE = 120
+EPSILON = 0.0001
+MAX_RAY_ITERATIONS = 5000
+MIN_MOVE_DISTANCE = 0.1
+RAY_ANGLE_STEP = math.radians(5.0)
 FULL_CIRCLE = math.tau
+SAFE_DIVISION_EPSILON = 1e-9
 
 PLAYER_HEIGHT = 24
 PLAYER_WIDTH = 24

@@ -1,4 +1,5 @@
 """Настройки игрового окна"""
+
 from config.enums import Rarity
 
 # Настройки отображения игрового экрана
@@ -16,16 +17,23 @@ CORRIDOR_COLOR = (140, 140, 220)
 CORRIDOR_WIDTH = 16
 WALL_THICKNESS = 4
 
-SOUND_VOLUME_MASTER = 0.7
-# Игровые механики
+END_OF_OXYGEN_LINE_COLOR = (255, 100, 100)
+END_OF_LEVEL_LINE_COLOR = (100, 255, 100)
+GREY = (200, 200, 200)
+GOLD = (255, 215, 0)
+BLUE =(100, 150, 255)
+PURPLE = (200, 100, 255)
+ORANGE = (255, 170, 0)
+MORE_ITEMS_COLOR = (150, 150, 150)
+OVERFLOW_PROTECTION = 12
 
 RARITY_COLORS = {
-    Rarity.COMMON: (200, 200, 200),  # Grey
-    Rarity.RARE: (100, 150, 255),  # Blue
-    Rarity.EPIC: (200, 100, 255),  # Purple
-    Rarity.LEGENDARY: (255, 215, 0),    # Gold
-    Rarity.ANCIENT: (255, 170, 0),    # Orange
-                }  
+    Rarity.COMMON: GREY,
+    Rarity.RARE: BLUE,
+    Rarity.EPIC: PURPLE,
+    Rarity.LEGENDARY: GOLD,
+    Rarity.ANCIENT: ORANGE,
+}
 
 BASE_COLOR = (255, 255, 255)
 
@@ -37,3 +45,4 @@ BUTTON_HOVER_COLOR = (50, 180, 255)
 BUTTON_TEXT_COLOR = (255, 255, 255)
 MENU_BACKGROUND = (8, 24, 52)
 PAUSE_OVERLAY = (0, 0, 0, 160)
+
