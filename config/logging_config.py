@@ -1,7 +1,7 @@
 import logging
 import sys
 
-def setup_logger(name=None, level=logging.DEBUG):
+def setup_logger(name=None, level=logging.INFO) -> logging.Logger:
     """Конфигурация логгера"""
     logger = logging.getLogger(name)
     
@@ -19,13 +19,6 @@ def setup_logger(name=None, level=logging.DEBUG):
         )
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
-        
-        file_handler = logging.FileHandler('app.log')
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
     
     return logger
 
-
-root_logger = setup_logger('myapp')

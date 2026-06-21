@@ -1,7 +1,4 @@
-# Настройки Markov Chain
-DEFAULT_GENERATION_LENGTH = 5
-FALLBACK_STATE = "unknown"
-
+# config/content_config.py
 GAME_TRANSITIONS = {
             "submerged_lab": {"corridor": 0.5,
                               "warning": 0.25,
@@ -20,10 +17,6 @@ GAME_TRANSITIONS = {
             "whisper": {"silence": 1.0}
         }
 
-LORE_CONTEXT_START = "submerged_lab"
-LORE_COOLDOWN_SECONDS = 5.0
-LORE_DISPLAY_DURATION = 3.0
-LORE_TEXT_LENGTH = 4
 LORE_VOCABULARY = {
     "submerged_lab": "Вы находитесь в затонувшей лаборатории.",
     "corridor": "В коридоре поблизости есть награды.",
@@ -40,6 +33,12 @@ LORE_VOCABULARY = {
     "unknown": "[Нераспознанный сигнал]"
 }
 
+LORE_CONTEXT_START = "submerged_lab"
+DEFAULT_GENERATION_LENGTH = 5
+FALLBACK_STATE = "unknown"
+LORE_COOLDOWN_SECONDS = 5.0
+LORE_DISPLAY_DURATION = 3.0
+LORE_TEXT_LENGTH = 4
 _UNIFORM_MIN = 0.0
 _SEQUENCE_START_INDEX = 1
 _EMPTY_TRANSITIONS = {} 

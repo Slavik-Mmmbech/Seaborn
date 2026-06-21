@@ -1,4 +1,6 @@
 import pytest
+
+from config.generation_config import MAX_DEPTH
 from spatial.quadtree import Bounds, QuadTree
 
 class TestBounds:
@@ -76,4 +78,4 @@ class TestQuadTree:
                 return current
             return max(count_depth(c, current + 1) for c in node.children)
             
-        assert count_depth(tree) <= QuadTree.MAX_DEPTH
+        assert count_depth(tree) <= MAX_DEPTH

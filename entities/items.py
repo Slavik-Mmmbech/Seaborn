@@ -27,7 +27,7 @@ class Item:
         self.description = description
 
     def __repr__(self):
-        return f"{self.name}/ {self.rarity.name} / {round(self.weight, 2)} / {round(self.value, 2)} / Описание: {self.description}"
+        return f"{self.name}/ {self.rarity.name} / {round(self.weight, 2)} / {round(self.value, 2)}"
 
 
 class Collectible:

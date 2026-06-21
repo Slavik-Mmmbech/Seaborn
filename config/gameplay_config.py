@@ -9,17 +9,28 @@ MIN_MOVE_DISTANCE = 0.1
 RAY_ANGLE_STEP = math.radians(5.0)
 FULL_CIRCLE = math.tau
 SAFE_DIVISION_EPSILON = 1e-9
+LIGHT_MASK_MIN = 3
+EMPTY = -1
 
+# Константы конфигурации игрока
 PLAYER_HEIGHT = 24
 PLAYER_WIDTH = 24
 PLAYER_MAX_OXYGEN = 100
 OXYGEN_DRAIN_PER_SECOND = 2
+OXYGEN_CRITICAL_THRESHOLD = 30
 INVENTORY_MAX_WEIGHT = 15.0
 PLAYER_MOVE_SPEED = 3.0
+VALID_DELTA = 2
+VALID_SIZE = 4
+EXP = 1e-3
 
+# Константы конфигурации shuffle bag для генерации предметов
 SHUFFLE_BAG_SIZE = 100
+MIN_SUFFLE_BAG_SIZE = 0
 
 # Настройки управления редкостью предметов
+LOW_VALUE = 10.0
+HIGH_VALUE = 100.0
 
 ITEM_RARITY_CONFIG = {
     Rarity.COMMON:    (0.5, 1.5, 1.0, 0.60),
@@ -29,7 +40,7 @@ ITEM_RARITY_CONFIG = {
     Rarity.ANCIENT:   (7.0, 10.5, 40.0, 0.02)
 } 
 
-#Структура ITEM_RARITY_CONFIG: {
+# Структура ITEM_RARITY_CONFIG: {
     # "Редкость": 
         # (мин.вес, 
         # макс.вес,
@@ -37,6 +48,8 @@ ITEM_RARITY_CONFIG = {
         # шанс спавна предмета)
     #}
 
+# Константы конфигурации коллекционных предметов
+COLLECTIBLES_COUNT = 30
 COLLECT_RECT_BORDER_RADIUS = 4
 COLLECT_RECT_SIZE = (4, 4, 24, 24) 
 COLLECT_RECT_WIDTH = 1
@@ -55,7 +68,15 @@ SPEED_PENALTY_FACTOR = 0.5
 NPC_ATTACK_RANGE = 28
 NPC_SEE_DISTANCE = 120
 NPC_TALK_DISTANCE = 50
+NPC_COORD = -20
+NPC_SPAWN_RANDOM_RANGE = 20
+ATTACKER_ROOM_INDICES = slice(2, 4)
+ESCAPER_ROOM_INDICES = slice(4, 6)
+STORYTELLER_ROOM_START_INDEX = 6
+STORYTELLER_MIN_DISTANCE_FROM_ENTRY = 240
+STORYTELLER_ROOM_COUNT = 2
 
+# Конфигурация наград за общение с NPC
 LOOT_REWARDS = {
                 "common_phrase": 0.50,
                 "hint": 0.30,
@@ -66,3 +87,9 @@ LOOT_REWARDS = {
 # Настройки уровней
 LEVEL_COUNT_TO_COMPLETE = 3
 NOTIF_TIME = 3.0
+
+STORYTELLER_OXYGEN_BONUS = 25       # Объем восстанавливаемого кислорода
+STORYTELLER_PICKUP_MIN_VAL = 10.0   # Минимальное базовое значение предмета
+STORYTELLER_PICKUP_MAX_VAL = 25.0   # Максимальное базовое значение предмета
+
+OXYGEN_REWARD_ON_PICKUP = 5

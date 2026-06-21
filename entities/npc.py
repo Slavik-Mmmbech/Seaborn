@@ -1,43 +1,34 @@
+"""Модуль игрового NPC."""
+
 import math
-from enum import Enum
 from typing import Tuple, Optional
 import pygame
 
-from ai import (
-    Blackboard,
-    BTNode,
-    Sequence,
-    Selector,
-    Condition,
-    Action,
-    NodeStatus,
-    MarkovChain
-)
+from ai import Blackboard, BTNode, NodeStatus, MarkovChain
 from config.display_config import FPS
 from config.gameplay_config import (
+    EXP,
     NPC_MAX_HEALTH,
     NPC_SPEED,
-    NPC_DELTA_TIME,
-    NPC_LABEL_FONT_SIZE,
     NPC_PATROL_ANGLE,
     NPC_RADIUS,
     PATROL_ANGLE_DELTA,
     POS_DELTA,
     LOOT_REWARDS,
-    OXYGEN_DRAIN_PER_SECOND
+    OXYGEN_DRAIN_PER_SECOND,
 )
 from config.content_config import (
     LORE_CONTEXT_START,
     LORE_TEXT_LENGTH,
     LORE_VOCABULARY,
-    GAME_TRANSITIONS,
 )
 from config.logging_config import setup_logger
 from config.enums import NPCType
+from entities.player import Player
 from loot.weighted_binary import WeightedBinaryLootGenerator as WBLGen
 
-
 logger = setup_logger(__name__)
+
 
 class NPC:
     """Игровой NPC. Использует BT для логики и цепь Маркова для нарратива."""
@@ -49,7 +40,7 @@ class NPC:
         bt_root: BTNode,
         lore_chain: MarkovChain,
         npc_type: NPCType = NPCType.ATTACKER,
-        dialog_rewards: Optional[WBLGen] = None, 
+        dialog_rewards: Optional[WBLGen] = None,
     ):
         self.id = npc_id
         self.position = start_pos
@@ -76,10 +67,9 @@ class NPC:
             self.dialog_rewards = WBLGen(LOOT_REWARDS)
         else:
             self.dialog_rewards = None
-    
+
         logger.info(
-        f"Инициализирован NPC {self.id}, тип {self.npc_type.value}, "
-        f"координата {self.position}"
+            f"Инициализирован NPC {self.id}, тип {self.npc_type.value}, "
         )
 
     def _setup_blackboard(self) -> None:
@@ -91,8 +81,12 @@ class NPC:
         self.blackboard.set("sees_player", False)
         self.blackboard.set("action_log", [])
 
-    def update(self, delta_time: float = NPC_DELTA_TIME) -> None:
+    def update(self, player: Optional["Player"] = None) -> None:
         """Основной тик ИИ."""
+        self.blackboard.set("npc", self)
+        if player is not None:
+            self.blackboard.set("player", player)
+
         status = self.bt_root.tick(self.blackboard)
 
         # Реакция на статус выполнения
@@ -103,7 +97,7 @@ class NPC:
 
     def speak_lore(self, context: str = LORE_CONTEXT_START) -> str:
         """Генерация текста через цепь Маркова.
-        
+
         Attributes:
             context: Токен начала текста.
 
@@ -111,22 +105,21 @@ class NPC:
             text: Сгенерированный лор.
         """
         raw_tokens = self.lore_chain.generate(context, LORE_TEXT_LENGTH)
-        
+
         cleaned_tokens = [raw_tokens[0]] if raw_tokens else []
         for i in range(1, len(raw_tokens)):
-            if raw_tokens[i] != raw_tokens[i-1]:
+            if raw_tokens[i] != raw_tokens[i - 1]:
                 cleaned_tokens.append(raw_tokens[i])
 
         phrases = []
         for token in cleaned_tokens:
             phrase = LORE_VOCABULARY.get(token, f"[{token.upper()}]")
             phrases.append(phrase)
-        
+
         text = " ".join(phrases)
-        
-        logger.info("Сгенерирован лорный элемент")
+
         return text
-    
+
     def generate_dialog_reward(self) -> Optional[str]:
         """
         Генерирует награду за диалог через взвешенный бинарный поиск.
@@ -157,7 +150,7 @@ class NPC:
         dx = target[0] - self.position[0]
         dy = target[1] - self.position[1]
         distance = math.hypot(dx, dy)
-        if distance < 1e-3:
+        if distance < EXP:
             return
         step = min(max_step if max_step is not None else self.speed, distance)
         self.position = (

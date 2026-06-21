@@ -79,17 +79,19 @@ class AudioManager:
 
     def toggle_bgm(self) -> bool:
         """
-        Переключает BGM. Если выключаем — ставим на паузу,
-        если включаем — снимаем с паузы.
+        Переключает BGM. Полная остановка/запуск.
+        Возвращает новое состояние.
         """
         self.bgm_enabled = not self.bgm_enabled
+        
         if self.bgm_enabled:
-            pygame.mixer.music.unpause()
+            # Включаем музыку
+            self.play_bgm(cfg.SoundKeys.BGM_THEME)
         else:
-            pygame.mixer.music.pause()
-        logger.info(f"BGM: {'ON' if self.bgm_enabled else 'OFF'}")
+            # Выключаем музыку
+            pygame.mixer.music.stop()
+        
         return self.bgm_enabled
-
     def fade_out_bgm(self) -> None:
         """
         Плавно уменьшает громкость BGM до 0 за FADE_DURATION_MS.

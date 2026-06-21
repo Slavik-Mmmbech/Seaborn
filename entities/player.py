@@ -71,7 +71,6 @@ class Player:
             self.width,
             self.height
         )
-        self.full_collection = []
         self.inventory = Inventory(INVENTORY_MAX_WEIGHT)
         self.entry_position = None
 

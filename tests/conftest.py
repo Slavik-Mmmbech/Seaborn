@@ -32,7 +32,3 @@ def prepared_bsp_tree(bsp_root):
 @pytest.fixture
 def room_generator():
     return RoomGenerator(min_fill_ratio=0.5)
-
-@pytest.fixture
-def corridor_generator(room_generator):
-    return CorridorGenerator(room_generator=room_generator, corner_probability=0.5)
