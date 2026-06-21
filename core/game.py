@@ -2,10 +2,13 @@ import pygame
 import random
 
 from entities.items import Item
+from core.audio_manager import AudioManager
+from config.audio_config import SoundKeys
 import config.display_config as display
 import config.gameplay_config as gameplay
 from core.world import World
 from config.enums import Rarity
+from rendering import WorldRenderer
 
 
 class Game:
@@ -15,8 +18,13 @@ class Game:
             (display.SCREEN_WIDTH, display.SCREEN_HEIGHT)
         )
         pygame.display.set_caption("Seaborn")
+        self.background = pygame.image.load(
+            "assets/bg/background.jpg"
+        ).convert()
         self.clock = pygame.time.Clock()
         self.world = World()
+        self.audio_manager = AudioManager()
+        self.world = World(audio_manager=self.audio_manager)
         self.world.generate()
         self.debug_mode = True
         self.running = True
@@ -24,14 +32,19 @@ class Game:
         self.show_menu = True
         self.show_end_screen = False
         self.levels_completed = 0
+        self.world_renderer = WorldRenderer()
+        self.audio_manager.play_bgm(SoundKeys.BGM_THEME)
 
     def _reset_game(self):
         self.levels_completed = 0
         self.world.full_collection = []
         self.world.generate()
+        self.audio_manager.play_bgm(SoundKeys.BGM_THEME)
         self.paused = False
         self.show_menu = False
         self.show_end_screen = False
+        if not pygame.mixer.music.get_busy():
+            self.audio_manager.play_bgm(SoundKeys.BGM_THEME)
 
     def run(self):
         while self.running:
@@ -48,6 +61,15 @@ class Game:
                             self.running = False
                         else:
                             self.paused = not self.paused
+                            if self.paused:
+                                self.audio_manager.pause_bgm()
+                            else:
+                                self.audio_manager.unpause_bgm()
+                    elif self.paused:
+                        if event.key == pygame.K_m:
+                            self.audio_manager.toggle_bgm()
+                        elif event.key == pygame.K_s:
+                            self.audio_manager.toggle_sfx()
                     elif event.key == pygame.K_r:
                         if self.show_menu or self.show_end_screen:
                             self._reset_game()
@@ -73,6 +95,7 @@ class Game:
                         else:
                             storyteller = self.world.get_nearby_storyteller()
                             if storyteller:
+                                self.audio_manager.play_sfx(SoundKeys.TALK)  
                                 self.world.active_storyteller = storyteller
                                 lore_text, reward = storyteller.talk()
 
@@ -110,45 +133,24 @@ class Game:
                 self.world.update(keys)
                 if self.world.player and self.world.player.oxygen <= 0:
                     self.show_end_screen = True
+                    self.audio_manager.play_sfx(SoundKeys.LOSE)
                 if self.world.level_complete:
                     self.levels_completed += 1
                     self.world.level_complete = False
                     if self.levels_completed >= gameplay.LEVEL_COUNT_TO_COMPLETE:
                         self.show_end_screen = True
+                        self.audio_manager.play_sfx(SoundKeys.WIN)
                     else:
                         self.world.generate()
 
-            self.screen.fill(display.WATER_COLOR)
+            self.screen.blit(self.background, (0, 0))
             if not self.show_menu:
-                self.world.draw(self.screen)
+                self.world_renderer.draw_world(self.screen, self.world)
+
             self.draw_ui(self.screen)
             pygame.display.flip()
 
         pygame.quit()
-
-    def _draw_collected_items(self, screen, player, small_font, x_pos, y_offset):
-        """Helper method to display collected items with rarity colors"""
-        rarity_colors = display.RARITY_COLORS
-
-        if not hasattr(player, "inventory") or not player.inventory:
-            return y_offset
-
-        for item in player.inventory[:5]:
-            rarity_color = rarity_colors.get(item.rarity, display.BASE_COLOR)
-            item_text = small_font.render(
-                f"• {item.name} ({item.rarity.value})", True, rarity_color
-            )
-            screen.blit(item_text, (x_pos, y_offset))
-            y_offset += 20
-
-        if len(player.inventory) > 5:
-            more_text = small_font.render(
-                f"+ {len(player.inventory) - 5} more items", True, (150, 150, 150)
-            )
-            screen.blit(more_text, (x_pos, y_offset))
-            y_offset += 20
-
-        return y_offset
 
     def draw_ui(self, screen):
         """Отрисовка интерфейса"""
@@ -168,7 +170,7 @@ class Game:
 
         if self.world.player:
             oxygen = self.world.player.oxygen
-            oxygen_color = display.BASE_COLOR if oxygen > 30 else (255, 100, 0)
+            oxygen_color = display.BASE_COLOR if oxygen > gameplay.OXYGEN_CRITICAL_THRESHOLD else (255, 100, 0)
             oxygen_text = font.render(f"Кислород: {int(oxygen)}", True, oxygen_color)
             screen.blit(oxygen_text, (10, 10))
 
@@ -366,21 +368,33 @@ class Game:
                 display.SCREEN_HEIGHT // 2 + 20,
             ),
         )
+        sfx_status = "ВКЛ" if self.audio_manager.sfx_enabled else "ВЫКЛ"
+        bgm_status = "ВКЛ" if self.audio_manager.bgm_enabled else "ВЫКЛ"
+        
+        audio_info = small_font.render(
+            f"[M] Музыка: {bgm_status}    [S] Звуки: {sfx_status}",
+            True, display.GREY
+        )
+        screen.blit(
+            audio_info,
+            (center_x - audio_info.get_width() // 2, current_y + 220)
+        )
 
     def _draw_end_screen(self, screen, font, small_font):
         overlay = pygame.Surface((display.SCREEN_WIDTH, display.SCREEN_HEIGHT))
-        overlay.fill(display.MENU_BACKGROUND)
-        screen.blit(overlay, (0, 0))
 
         total_score = sum(item.value for item in self.world.full_collection)
         
         if self.world.player and self.world.player.oxygen <= 0:
+            overlay.fill(display.LOSE_BACKGROUND)
             line = "Кислород закончился!"
             title_color = display.END_OF_OXYGEN_LINE_COLOR
         else:
+            overlay.fill(display.WIN_BACKGROUND)
             line = "Уровень завершен!"
             title_color = display.END_OF_LEVEL_LINE_COLOR
-            
+
+        screen.blit(overlay, display.BASE_COORDS)
         big_font = pygame.font.Font(None, 56)
         end_text = big_font.render(line, True, title_color)
         score_text = font.render(f"Общий счет: {int(total_score)}", True, display.GOLD)
@@ -402,6 +416,8 @@ class Game:
         screen.blit(items_header, (center_x - items_header.get_width() // 2, current_y))
         current_y += 40
         
+        if self.world.audio:
+            self.world.audio.stop_bgm()
         max_items_to_show = display.OVERFLOW_PROTECTION
         items_to_show = self.world.full_collection[:max_items_to_show]
         

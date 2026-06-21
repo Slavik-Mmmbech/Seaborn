@@ -12,7 +12,9 @@
 """
 import random
 
-from config.gameplay_config import ITEM_RARITY_CONFIG, SHUFFLE_BAG_SIZE
+from config.gameplay_config import (
+    ITEM_RARITY_CONFIG, SHUFFLE_BAG_SIZE, MIN_SUFFLE_BAG_SIZE
+)
 from config.generation_config import LAST_RARITY_INDEX
 from entities.items import Rarity
 
@@ -43,10 +45,10 @@ class LootBag:
         все оставшиеся слоты, чтобы сумма предметов точно равнялась SHUFFLE_BAG_SIZE.
 
         Raises:
-            ValueError: Если SHUFFLE_BAG_SIZE <= 0 (защита от невалидной конфигурации).
+            ValueError: Если SHUFFLE_BAG_SIZE <= MIN_SUFFLE_BAG_SIZE (защита от невалидной конфигурации).
         """
-        if SHUFFLE_BAG_SIZE <= 0:
-            raise ValueError("SHUFFLE_BAG_SIZE must be greater than zero.")
+        if SHUFFLE_BAG_SIZE <= MIN_SUFFLE_BAG_SIZE:
+            raise ValueError("SHUFFLE_BAG_SIZE must be greater than the minimum size.")
         
         self._bag.clear()
         remaining_slots = SHUFFLE_BAG_SIZE

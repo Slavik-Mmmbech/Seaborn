@@ -2,30 +2,24 @@
 import math
 import pygame
 import random
-from typing import List, Tuple
+from typing import Any, List, Sequence, Tuple
+
 import ai
-from rendering import (
-    NPCRenderer,
-    PlayerRenderer,
-    CollectibleRenderer,
-    WorldRenderer,
-    DungeonRenderer
-)
+import config.content_config as content
 from config.enums import TileType
 import config.display_config as display
 import config.gameplay_config as gameplay
 import config.generation_config as gen
-import config.content_config as content
-from entities.npc import NPC, NPCType
-from entities.player import Player
+from config.logging_config import setup_logger
 from entities.items import Collectible
 from entities.items import Item
+from entities.npc import NPC, NPCType
+from entities.player import Player
 from generation.dungeon import DungeonGenerator
-from lighting.lightmap_raycasting import LightSource, Raycaster
-from spatial.quadtree import QuadTree, Bounds
+from lighting.lightmap_raycasting import Raycaster
 from loot.loot_bag import LootBag
 from loot.weighted_binary import WeightedBinaryLootGenerator
-from config.logging_config import setup_logger
+from spatial.quadtree import QuadTree, Bounds
 
 logger = setup_logger(__name__)
 
@@ -33,16 +27,16 @@ logger = setup_logger(__name__)
 class World:
     """Состояние игрового уровня: коллизии, сущности, геометрия подземелья."""
 
-    def __init__(self):
+    def __init__(self, audio_manager=None):
         self.player: Player | None = None
         self.collectibles: List[Collectible] = []
-        self.rooms: List[pygame.Rect] = []
+        self.rooms: Sequence[Any] = []
         self.corridors: List[tuple] = []
         self.walkable_areas: List[pygame.Rect] = []
         self.walls: List[pygame.Rect] = []
         self.room_values = {}
         self.collected_items = []
-        self.full_collection = [] 
+        self.full_collection = []
         self.npcs: List[NPC] = []
         self.entry_point = None  # Где начал игрок
         self.exit_rect = None  # Зона выхода
@@ -51,35 +45,29 @@ class World:
         self.raycaster: Raycaster | None = None
         self.level_index = 0
         self.completed_levels = 0
+        self.audio = audio_manager
         self.story_mode_active = False
         self.active_storyteller: NPC | None = None
         self.talk_text = ""
         self.notification_message = ""
-        self.notification_time = 0.0  # Timer for notification display
+        self.notification_time = 0.0
         self.player_in_exit_zone = False
         world_bounds = Bounds(0, 0, display.SCREEN_WIDTH, display.SCREEN_HEIGHT)
         self.spatial_index = QuadTree(
-            world_bounds,
-            max_capacity=gen.MAX_CAPACITY,
-            max_depth=gen.MAX_DEPTH
-            )
+            world_bounds, max_capacity=gen.MAX_CAPACITY, max_depth=gen.MAX_DEPTH
+        )
         self.level_complete = False
-        logger.info("ГЕНЕРАЦИЯ МИРА ПРОШЛА УСПЕШНО. УДАЧИ!")
-        self.npc_renderer = NPCRenderer()
-        self.player_renderer = PlayerRenderer()
-        self.collectible_renderer = CollectibleRenderer()
-        self.world_renderer = WorldRenderer()
-        self.dungeon_renderer = DungeonRenderer() 
+
 
     def _room_to_rect(self, room_data: Tuple[int, int, int, int]) -> pygame.Rect:
         """Преобразует кортеж комнаты в pygame.Rect."""
         return pygame.Rect(*room_data)
-    
+
     def _get_room_center(self, room_data: Tuple[int, int, int, int]) -> Tuple[int, int]:
         """Возвращает центр комнаты из кортежа."""
         x, y, width, height = room_data
         return (x + width // 2, y + height // 2)
-    
+
     def _assign_room_values(self) -> None:
         """Назначает ценность комнатам: дальше от входа = ценнее"""
         if not self.rooms or not self.entry_point:
@@ -98,9 +86,7 @@ class World:
 
     def _calculate_distance(self, point1, point2) -> float:
         """Расстояние между двумя точками"""
-        return (
-            (point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2
-            ) ** 0.5
+        return ((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2) ** 0.5
 
     def generate(self) -> None:
         """
@@ -125,10 +111,9 @@ class World:
         self.player_in_exit_zone = False
         self.spatial_index.clear()
 
-        dg = DungeonGenerator(display.SCREEN_WIDTH,
-                              display.SCREEN_HEIGHT,
-                              depth=gen.DEFAULT_BSP_DEPTH
-                              )
+        dg = DungeonGenerator(
+            display.SCREEN_WIDTH, display.SCREEN_HEIGHT, depth=gen.DEFAULT_BSP_DEPTH
+        )
         self.rooms, self.corridors = dg.generate()
 
         # Построение геометрии
@@ -138,11 +123,11 @@ class World:
 
         # Спавн сущностей
         if self.rooms:
-            start_room = pygame.Rect(*self.rooms[0]) 
+            start_room = pygame.Rect(*self.rooms[0])
             self.player = Player(start_room.centerx, start_room.centery)
             self.entry_point = start_room.center
             self.exit_rect = start_room.copy()
-            self.exit_rect.inflate_ip(-20, -20)
+            self.exit_rect.inflate_ip(gameplay.NPC_COORD, gameplay.NPC_COORD)
 
         self._assign_room_values()
         self._spawn_collectibles()
@@ -164,43 +149,17 @@ class World:
 
         for corridor in self.corridors:
             x1, y1, x2, y2 = corridor
-            
+
             if x1 == x2:  # Вертикальный
                 corridor_rect = pygame.Rect(
-                    x1 - half_width, min(y1, y2),
-                    corridor_width, abs(y2 - y1)
+                    x1 - half_width, min(y1, y2), corridor_width, abs(y2 - y1)
                 )
             else:  # Горизонтальный
                 corridor_rect = pygame.Rect(
-                    min(x1, x2), y1 - half_width,
-                    abs(x2 - x1), corridor_width
+                    min(x1, x2), y1 - half_width, abs(x2 - x1), corridor_width
                 )
-            
+
             self.walkable_areas.append(corridor_rect)
-
-    def _generate_walls_from_walkable_areas(self) -> None:
-        """Создает стены как границы проходимых зон + границы экрана"""
-        self.walls = []
-
-        # 1. Границы экрана
-        border_thickness = 4
-        screen_borders = [
-            pygame.Rect(0, 0, display.SCREEN_WIDTH, border_thickness),
-            pygame.Rect(
-                0,
-                display.SCREEN_HEIGHT - border_thickness,
-                display.SCREEN_WIDTH,
-                border_thickness,
-            ),
-            pygame.Rect(0, 0, border_thickness, display.SCREEN_HEIGHT),
-            pygame.Rect(
-                display.SCREEN_WIDTH - border_thickness,
-                0,
-                border_thickness,
-                display.SCREEN_HEIGHT,
-            ),
-        ]
-        self.walls.extend(screen_borders)
 
     def _is_position_valid(self, rect: pygame.Rect) -> bool:
         """Проверяет, находится ли центр игрока в проходимой зоне"""
@@ -210,7 +169,11 @@ class World:
         # Создание точки в центре игрока для проверки
         center_x = rect.centerx
         center_y = rect.centery
-        point_rect = pygame.Rect(center_x - 2, center_y - 2, 4, 4)
+        point_rect = pygame.Rect(center_x - gameplay.VALID_DELTA,
+                                 center_y - gameplay.VALID_DELTA,
+                                 gameplay.VALID_SIZE,
+                                 gameplay.VALID_SIZE
+                                 )
 
         for area in self.walkable_areas:
             if point_rect.colliderect(area):
@@ -242,9 +205,7 @@ class World:
         bag = LootBag()
         new_collectibles = []
 
-        room_weights = [
-            self.room_values.get(i, 0.0) for i in range(len(self.rooms))
-        ]
+        room_weights = [self.room_values.get(i, 0.0) for i in range(len(self.rooms))]
 
         if sum(room_weights) == 0:
             room_weights = [1.0] * len(self.rooms)
@@ -258,18 +219,18 @@ class World:
                 "loot",
                 rarity,
                 random.uniform(min_w, max_w),
-                random.uniform(10.0, 25.0) * value_mult,
+                random.uniform(gameplay.LOW_VALUE,
+                               gameplay.HIGH_VALUE
+                               ) * value_mult,
             )
 
-            # Выбираем комнату (кортеж)
             room_data = random.choices(self.rooms, weights=room_weights)[0]
-            
-            # ПРЕОБРАЗУЕМ кортеж в Rect для удобной работы
+
             room = pygame.Rect(*room_data)
 
             padding = gen.ROOM_OFFSET
             min_x, max_x = room.left + padding, room.right - padding
-            min_y, max_y = room.top + padding, room.bottom - padding 
+            min_y, max_y = room.top + padding, room.bottom - padding
 
             safe_x = min_x if max_x <= min_x else random.randint(min_x, max_x)
             safe_y = min_y if max_y <= min_y else random.randint(min_y, max_y)
@@ -280,48 +241,6 @@ class World:
         logger.info(f"Предметы были распределены.")
         self._update_spatial_index()
 
-    def draw_debug(self, screen: pygame.Surface) -> None:
-        """Отрисовка BSP структуры для отладки"""
-        debug_surface = pygame.Surface((display.SCREEN_WIDTH, display.SCREEN_HEIGHT))
-        debug_surface.set_alpha(50)
-        debug_surface.fill((0, 255, 0))
-
-        for area in self.walkable_areas:
-            pygame.draw.rect(debug_surface, (0, 255, 0), area)
-
-        screen.blit(debug_surface, (0, 0))
-        for i, room in enumerate(self.rooms):
-            color = (100 + (i * 30) % 100, 150 + (i * 20) % 50, 100)
-            pygame.draw.rect(screen, color, room)
-            pygame.draw.rect(screen, (255, 255, 255), room, width=1)
-
-            # Нумерация комнат
-            font = pygame.font.Font(None, 24)
-            text = font.render(str(i), True, (255, 255, 255))
-            screen.blit(text, (room.centerx - 10, room.centery - 10))
-
-        # Отрисовка коридоров
-        for corridor in self.corridors:
-            x1, y1, x2, y2 = corridor
-            pygame.draw.line(screen, (255, 200, 0), (x1, y1), (x2, y2), width=4)
-
-            # Точки соединения
-            pygame.draw.circle(screen, (255, 100, 0), (x1, y1), 3)
-            pygame.draw.circle(screen, (255, 100, 0), (x2, y2), 3)
-
-        # Инфо о генерации
-        font = pygame.font.Font(None, 28)
-        info = [
-            f"Rooms: {len(self.rooms)}",
-            f"Corridors: {len(self.corridors)}",
-            f"Press R - Regenerate",
-            f"Кол-во предметов - {self.collected_items})",
-        ]
-
-        for i, text in enumerate(info):
-            rendered = font.render(text, True, (255, 255, 255))
-            screen.blit(rendered, (10, 10 + i * 30))
-
     def _generate_walls_from_geometry(self) -> None:
         """
         Создаёт стены как границы между проходимыми зонами и водой.
@@ -329,21 +248,20 @@ class World:
         self.walls = []
 
         # 1. Границы экрана (внешние стены)
-        border_thickness = 4
         self.walls.extend(
             [
-                pygame.Rect(0, 0, display.SCREEN_WIDTH, border_thickness),
+                pygame.Rect(0, 0, display.SCREEN_WIDTH, display.WALL_THICKNESS),
                 pygame.Rect(
                     0,
-                    display.SCREEN_HEIGHT - border_thickness,
+                    display.SCREEN_HEIGHT -  gameplay.VALID_DELTA,
                     display.SCREEN_WIDTH,
-                    border_thickness,
+                     gameplay.VALID_DELTA,
                 ),
-                pygame.Rect(0, 0, border_thickness, display.SCREEN_HEIGHT),
+                pygame.Rect(0, 0,  gameplay.VALID_DELTA, display.SCREEN_HEIGHT),
                 pygame.Rect(
-                    display.SCREEN_WIDTH - border_thickness,
+                    display.SCREEN_WIDTH -  gameplay.VALID_DELTA,
                     0,
-                    border_thickness,
+                     gameplay.VALID_DELTA,
                     display.SCREEN_HEIGHT,
                 ),
             ]
@@ -363,12 +281,14 @@ class World:
                     gy * display.TILE_SIZE + display.TILE_SIZE / 2,
                 )
 
-                if not any(area.collidepoint(cell_center) for area in self.walkable_areas):
-                    self.light_grid[gy][gx] = -1 # маркер "неизвестная пустота"
+                if not any(
+                    area.collidepoint(cell_center) for area in self.walkable_areas
+                ):
+                    self.light_grid[gy][gx] = gameplay.EMPTY
 
         for gy in range(grid_height):
             for gx in range(grid_width):
-                if self.light_grid[gy][gx] == -1:
+                if self.light_grid[gy][gx] == gameplay.EMPTY:
                     is_border_wall = False
                     for dy in [-1, 0, 1]:
                         for dx in [-1, 0, 1]:
@@ -379,7 +299,7 @@ class World:
                                     break
                         if is_border_wall:
                             break
-                    
+
                     if is_border_wall:
                         self.light_grid[gy][gx] = TileType.WALL
                     else:
@@ -397,7 +317,6 @@ class World:
         if not self.rooms:
             return
 
-        # ПРЕОБРАЗУЕМ все комнаты в Rect для работы
         rooms_rects = [pygame.Rect(*room_data) for room_data in self.rooms]
 
         attacker_rooms = rooms_rects[2:4]
@@ -447,9 +366,7 @@ class World:
                 lore_chain=lore_chain,
                 npc_type=NPCType.STORYTELLER,
             )
-            dialog_rewards = WeightedBinaryLootGenerator(
-                gameplay.LOOT_REWARDS
-            )
+            dialog_rewards = WeightedBinaryLootGenerator(gameplay.LOOT_REWARDS)
             npc.dialog_rewards = dialog_rewards
             npc.bt_root = self._create_npc_behavior_tree(npc)
             self.npcs.append(npc)
@@ -534,28 +451,10 @@ class World:
             ]
         )
 
-    def _render_light_mask(self, screen: pygame.Surface) -> None:
-        if self.raycaster is None or self.player is None:
-            return
-
-        source = LightSource(
-            self.player.rect.centerx, self.player.rect.centery, gameplay.LIGHT_RADIUS_BASE
-        )
-        polygon = self.raycaster.compute_visibility_polygon(source)
-        if len(polygon) < 3:
-            return
-
-        dark_overlay = pygame.Surface(
-            (display.SCREEN_WIDTH, display.SCREEN_HEIGHT), pygame.SRCALPHA
-        )
-        dark_overlay.fill((0, 0, 0, 210))
-        pygame.draw.polygon(dark_overlay, (0, 0, 0, 0), polygon)
-        screen.blit(dark_overlay, (0, 0))
-
     # Использование QuadTree снижает сложность поиска пересекающихся объектов
     # с O(N) до O(log N), что критично для производительности при большом
     # количестве сущностей на карте.
-    def update(self, keys: dict) -> None:
+    def update(self, keys: Any) -> None:
         if not self.player:
             return
 
@@ -589,7 +488,9 @@ class World:
                 distance = self._calculate_distance(
                     npc.position, self.player.rect.center
                 )
-                npc.blackboard.set("sees_player", distance <= gameplay.NPC_TALK_DISTANCE)
+                npc.blackboard.set(
+                    "sees_player", distance <= gameplay.NPC_TALK_DISTANCE
+                )
 
         if self.player.oxygen <= 0:
             print("GAME OVER - Out of oxygen!")
@@ -610,6 +511,10 @@ class World:
                 print(f"Собрано: {c.item}")
                 if hasattr(self.player, "pickup"):
                     if self.player.pickup(c.item):
+                        if self.audio is not None:
+                            from config.audio_config import SoundKeys
+
+                            self.audio.play_sfx(SoundKeys.PICKUP)
                         collected_this_frame.append(c)
                         self.player.oxygen = min(
                             self.player.oxygen + 5, gameplay.PLAYER_MAX_OXYGEN
@@ -643,24 +548,4 @@ class World:
                     npc.blackboard.set("sees_player", can_talk)
                     if can_talk:
                         self.storyteller_in_range = True
-            npc.update(1 / display.FPS)
-
-    def draw(self, screen: pygame.Surface) -> None:
-        """Отрисовка всего мира через рендереры."""
-        # 1. Рисуем мир (статические элементы)
-        self.dungeon_renderer.draw_corridors(screen, self.corridors)
-        self.dungeon_renderer.draw_rooms(screen, self.rooms)
-        self.dungeon_renderer.draw_walls(screen, self.walls)
-        
-        # 2. Рисуем сущности через их рендереры
-        if self.player:
-            self.player_renderer.draw(screen, self.player)
-        
-        for npc in self.npcs:
-            self.npc_renderer.draw(screen, npc)
-        
-        for c in self.collectibles:
-            self.collectible_renderer.draw(screen, c)
-        
-        # 3. Эффект освещения
-        self._render_light_mask(screen)
+            npc.update()

@@ -1,5 +1,6 @@
 """Рендерер для игрового мира - отрисовка статических элементов."""
 import pygame
+
 from rendering.npc_renderer import NPCRenderer
 from rendering.player_renderer import PlayerRenderer
 from rendering.collectible_renderer import CollectibleRenderer
@@ -42,12 +43,12 @@ class WorldRenderer:
             world.player.rect.centerx, world.player.rect.centery, gameplay.LIGHT_RADIUS_BASE
         )
         polygon = world.raycaster.compute_visibility_polygon(source)
-        if len(polygon) < 3:
+        if len(polygon) < gameplay.LIGHT_MASK_MIN:
             return
 
         dark_overlay = pygame.Surface(
             (display.SCREEN_WIDTH, display.SCREEN_HEIGHT), pygame.SRCALPHA
         )
-        dark_overlay.fill((0, 0, 0, 210))
-        pygame.draw.polygon(dark_overlay, (0, 0, 0, 0), polygon)
-        screen.blit(dark_overlay, (0, 0))
+        dark_overlay.fill(display.DARK_OVERLAY)
+        pygame.draw.polygon(dark_overlay, display.BLACK, polygon)
+        screen.blit(dark_overlay, display.BASE_COORDS)
