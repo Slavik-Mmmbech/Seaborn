@@ -1,7 +1,11 @@
 import pygame
+import random
+
+from entities.items import Item
 import config.display_config as display
 import config.gameplay_config as gameplay
 from core.world import World
+from config.enums import Rarity
 
 
 class Game:
@@ -23,6 +27,7 @@ class Game:
 
     def _reset_game(self):
         self.levels_completed = 0
+        self.world.full_collection = []
         self.world.generate()
         self.paused = False
         self.show_menu = False
@@ -49,13 +54,13 @@ class Game:
                         elif self.world.player and self.world.player.oxygen <= 0:
                             self._reset_game()
                         elif self.world.player_in_exit_zone:
-                            if self.world.player.inventory:
-                                score = self.world.player.calculate_score()
+                            if self.world.player:
+                                score = self.world.player.calculate_score() if self.world.player.inventory else 0
+                                items_count = len(self.world.player.inventory)
                                 print(f"Успешное возвращение! Score: {score}")
-                                print(
-                                    f"Собрано предметов: {len(self.world.player.inventory)}"
-                                )
-                            self.world.level_complete = True
+                                print(f"Собрано предметов: {items_count}")
+                                self.world.full_collection.extend(i for i in self.world.player.inventory)
+                                self.world.level_complete = True
                         else:
                             self.world.generate()
                     elif event.key == pygame.K_SPACE and self.world.active_storyteller:
@@ -71,21 +76,24 @@ class Game:
                                 self.world.active_storyteller = storyteller
                                 lore_text, reward = storyteller.talk()
 
-                                # Обрабатываем награду
                                 if reward == "oxygen_bonus":
                                     if self.world.player:
                                         self.world.player.oxygen = min(
                                             self.world.player.oxygen + 25,
                                             gameplay.PLAYER_MAX_OXYGEN,
                                         )
-                                    self.world.talk_text = f"⭐ {lore_text}\n\n\n\n [ДРЕВНИЙ ДУХ ДАРУЕТ BОЗДУХ! +25 O₂]"
+                                    self.world.talk_text = f"{lore_text}  [ДРЕВНИЙ ДУХ ДАРУЕТ BОЗДУХ! +25 O₂]"
                                 elif reward == "rare_lore":
+                                    success = self._give_random_item(Rarity.LEGENDARY, "Реликвия")
+                                    msg = " [ЛЕГЕНДАРНЫЙ РЕЛИКТ ПОЛУЧЕН!]" if success else " [ИНВЕНТАРЬ ПОЛОН!]"
                                     self.world.talk_text = (
-                                        f"📜 {lore_text}\n\n  [РЕДКАЯ ИСТОРИЯ]"
+                                        f"{lore_text}\n\n{msg}"
                                     )
                                 elif reward == "hint":
+                                    success = self._give_random_item(Rarity.EPIC, "Артефакт")
+                                    msg = " [ЭПИЧЕСКИЙ АРТЕФАКТ ПОЛУЧЕН!]" if success else " [ИНВЕНТАРЬ ПОЛОН!]"
                                     self.world.talk_text = (
-                                        f"💡 {lore_text}\n\n  [ПОДСКАЗКА]"
+                                        f"{lore_text}\n\n{msg}"
                                     )
                                 else:
                                     self.world.talk_text = lore_text
@@ -166,7 +174,7 @@ class Game:
 
             if hasattr(self.world.player, "inventory"):
                 inv_count_text = small_font.render(
-                    f"Items: {len(self.world.player.inventory)} (Weight: {self.world.player.current_weight:.1f}/{self.world.player.max_weight})",
+                    f"Предметы: {len(self.world.player.inventory)} (Общий вес: {self.world.player.inventory.current_weight:.1f}/{self.world.player.inventory.max_weight})",
                     True,
                     display.BASE_COLOR,
                 )
@@ -206,7 +214,6 @@ class Game:
             )
             screen.blit(notification_text, notification_rect)
 
-        # Display level complete prompt when in exit zone
         if self.world.player_in_exit_zone:
             exit_prompt_font = pygame.font.Font(None, 28)
             exit_text = exit_prompt_font.render(
@@ -220,11 +227,10 @@ class Game:
             screen.blit(exit_text, exit_rect)
 
         hints = [
-            "WASD/Arrows - Move",
-            "E - Talk when near storyteller",
-            "R - Regenerate",
-            "D - Debug mode",
-            "ESC - Pause/Quit",
+            "WASD/Arrows - Движение",
+            "E - Говорить с storyteller",
+            "R - Регенерировать",
+            "ESC - Пауза",
         ]
         for i, hint in enumerate(hints):
             text = small_font.render(hint, True, (200, 200, 200))
@@ -303,6 +309,28 @@ class Game:
         )
         screen.blit(start, (display.SCREEN_WIDTH // 2 - start.get_width() // 2, 220))
 
+    def _give_random_item(self, rarity: Rarity, item_name: str) -> bool:
+        """
+        Создает и выдает игроку случайный предмет заданной редкости.
+        Возвращает True, если предмет успешно добавлен в инвентарь.
+        """
+        if not self.world.player or not hasattr(self.world.player, "inventory"):
+            return False
+            
+        cfg = gameplay.ITEM_RARITY_CONFIG.get(rarity)
+        if not cfg:
+            return False
+            
+        min_w, max_w, value_mult, _ = cfg
+        item = Item(
+            item_name,
+            rarity, 
+            random.uniform(min_w, max_w), 
+            random.uniform(10.0, 25.0) * value_mult
+        )
+        
+        return self.world.player.pickup(item)
+    
     def _draw_pause_overlay(self, screen, font, small_font):
         overlay = pygame.Surface(
             (display.SCREEN_WIDTH, display.SCREEN_HEIGHT), pygame.SRCALPHA
@@ -313,6 +341,17 @@ class Game:
         resume_text = small_font.render(
             "Нажмите ESC чтобы продолжить", True, (200, 200, 200)
         )
+        current_score= sum(item.value for item in self.world.full_collection)
+
+        score_text = font.render(
+            f"Нынешний счет: {int(current_score)}",
+            True, display.BASE_COLOR
+            )
+
+        center_x = display.SCREEN_WIDTH // 2
+        current_y = 200
+
+        screen.blit(score_text, (center_x - score_text.get_width() // 2, current_y))
         screen.blit(
             paused_text,
             (
@@ -332,45 +371,56 @@ class Game:
         overlay = pygame.Surface((display.SCREEN_WIDTH, display.SCREEN_HEIGHT))
         overlay.fill(display.MENU_BACKGROUND)
         screen.blit(overlay, (0, 0))
+
+        total_score = sum(item.value for item in self.world.full_collection)
+        
         if self.world.player and self.world.player.oxygen <= 0:
-            line = "Out of oxygen!"
+            line = "Кислород закончился!"
+            title_color = display.END_OF_OXYGEN_LINE_COLOR
         else:
-            line = "Супер! Попробовать еще раз?"
-        end_text = font.render(line, True, display.BASE_COLOR)
-        action_text = small_font.render(
-            "Нажмите R чтобы регенерировать или ESC чтобы  остановить",
-            True,
-            (200, 200, 200),
-        )
-        screen.blit(
-            end_text, (display.SCREEN_WIDTH // 2 - end_text.get_width() // 2, 220)
-        )
-        screen.blit(
-            action_text, (display.SCREEN_WIDTH // 2 - action_text.get_width() // 2, 280)
-        )
-
-        if self.world.player:
-            oxygen_color = (
-                display.BASE_COLOR if self.world.player.oxygen > 30 else (255, 100, 0)
+            line = "Уровень завершен!"
+            title_color = display.END_OF_LEVEL_LINE_COLOR
+            
+        big_font = pygame.font.Font(None, 56)
+        end_text = big_font.render(line, True, title_color)
+        score_text = font.render(f"Общий счет: {int(total_score)}", True, display.GOLD)
+        items_header = font.render(
+            f"Собранные предметы ({len(self.world.full_collection)}):", 
+            True, 
+            display.BASE_COLOR
             )
-            oxygen_text = font.render(
-                f"Кислород: {int(self.world.player.oxygen)}", True, oxygen_color
-            )
-            screen.blit(oxygen_text, (10, 10))
+        
+        center_x = display.SCREEN_WIDTH // 2
+        current_y = 120
+        
+        screen.blit(end_text, (center_x - end_text.get_width() // 2, current_y))
+        current_y += 70
+        
+        screen.blit(score_text, (center_x - score_text.get_width() // 2, current_y))
+        current_y += 50
+        
+        screen.blit(items_header, (center_x - items_header.get_width() // 2, current_y))
+        current_y += 40
+        
+        max_items_to_show = display.OVERFLOW_PROTECTION
+        items_to_show = self.world.full_collection[:max_items_to_show]
+        
+        for item in items_to_show:
+            rarity_color = display.RARITY_COLORS.get(item.rarity, display.BASE_COLOR)
+            # Формат: Rarity - Value
+            item_str = f"• {item.name} ({item.rarity.value}) - {int(item.value)}"
+            item_text = small_font.render(item_str, True, rarity_color)
+            screen.blit(item_text, (center_x - item_text.get_width() // 2, current_y))
+            current_y += 25
+            
+        if len(self.world.full_collection) > max_items_to_show:
+            remaining = len(self.world.full_collection) - max_items_to_show
+            more_text = small_font.render(f"... и еще {remaining} предметов", 
+                                          True, 
+                                          display.MORE_ITEMS_COLOR)
+            screen.blit(more_text, (center_x - more_text.get_width() // 2, current_y))
+            current_y += 30
 
-            y_pos = 50
-            if hasattr(self.world.player, "inventory") and self.world.player.inventory:
-                inv_header = small_font.render(
-                    f"Собранные предметы: ({len(self.world.player.inventory)}):",
-                    True,
-                    display.BASE_COLOR,
-                )
-                screen.blit(inv_header, (10, y_pos))
-                y_pos = self._draw_collected_items(
-                    screen, self.world.player, small_font, 10, y_pos + 25
-                )
-
-        hints = ["R - Рестарт", "ESC - Пауза"]
-        for i, hint in enumerate(hints):
-            text = small_font.render(hint, True, (200, 200, 200))
-            screen.blit(text, (display.SCREEN_WIDTH - 220, 10 + i * 20))
+        current_y += 30
+        hint = font.render("Нажмите R для новой игры", True, display.GREY)
+        screen.blit(hint, (center_x - hint.get_width() // 2, current_y))

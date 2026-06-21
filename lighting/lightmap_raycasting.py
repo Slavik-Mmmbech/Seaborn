@@ -1,14 +1,9 @@
 import math
 from dataclasses import dataclass
 from typing import List, Tuple
-from enum import IntEnum
-
+from config.enums import TileType
 from config.display_config import TILE_SIZE
-from config.gameplay_config import FULL_CIRCLE
-
-class TileType(IntEnum):
-    FLOOR = 0
-    WALL = 1
+from config.gameplay_config import RAY_ANGLE_STEP, EPSILON
 
 class GameMap:
     def __init__(self, grid: List[List[int]], grid_height: int, grid_width: int):
@@ -16,8 +11,8 @@ class GameMap:
         self.grid_height = grid_height
         self.grid_width = grid_width
 
-    def _is_wall(self, gx: int, gy: int) -> bool:
-        """Проверка выхода за границы мира или столкновения с препятствием (1)."""
+    def is_wall(self, gx: int, gy: int) -> bool:
+        """Проверка выхода за границы мира или столкновения с препятствием."""
         if 0 <= gx < self.grid_width and 0 <= gy < self.grid_height:
             return self.grid[gy][gx] == TileType.WALL
         return True
@@ -28,15 +23,13 @@ class LightSource:
     x: float
     y: float
     radius: float
-    angle_step: float = math.radians(5.0)  # ~72 луча на полный круг
+    angle_step: float = RAY_ANGLE_STEP
 
 class Raycaster:
     """
     Алгоритм расчёта видимости (Visibility Polygon) через пошаговое лучепускание.
+    Использует DDA (Digital Differential Analyzer) для нахождения пересечений.
     """
-    RAYCAST_STEP: float = 1.0
-    MAX_ITERATIONS: int = 5000  # Защита от зависания при некорректных данных
-
     def __init__(self, grid: List[List[int]], tile_size: int = TILE_SIZE):
         self.grid = grid
         self.tile_size = tile_size
@@ -46,13 +39,10 @@ class Raycaster:
 
     def compute_visibility_polygon(self, source: LightSource) -> List[Tuple[float, float]]:
         angles = set()
-        EPS = 0.0001
-        
-        # 1. Сбор углов стен
+
         for y in range(self.game_map.grid_height):
             for x in range(self.game_map.grid_width):
                 if self.game_map.grid[y][x] == TileType.WALL:
-                    # 4 угла тайла
                     corners = [
                         (x * self.tile_size, y * self.tile_size),
                         ((x + 1) * self.tile_size, y * self.tile_size),
@@ -61,79 +51,89 @@ class Raycaster:
                     ]
                     for wx, wy in corners:
                         ang = math.atan2(wy - source.y, wx - source.x)
-                        angles.update([ang - EPS, ang, ang + EPS])
+                        angles.update([ang - EPSILON, ang, ang + EPSILON])
 
-
-        sorted_angles = sorted(angles)
+        sorted_angles = sorted(list(angles))
         polygon_points = []
         
         for ang in sorted_angles:
-            # Нормализуем угол в [0, 2π)
-            ang = ang % FULL_CIRCLE
             hit_x, hit_y = self._cast_ray(source, ang)
             polygon_points.append((hit_x, hit_y))
             
-        # Замыкаем полигон
         if polygon_points:
             polygon_points.append(polygon_points[0])
         return polygon_points
 
     def _cast_ray(self, source: LightSource, angle: float) -> Tuple[float, float]:
-        """Выпускает один луч с использованием алгоритма DDA."""
+        """
+        Выпускает один луч с использованием классического алгоритма DDA.
+        """
         dx = math.cos(angle)
         dy = math.sin(angle)
+        if abs(dx) < 1e-9: dx = 1e-9 * (1 if dx >= 0 else -1)
+        if abs(dy) < 1e-9: dy = 1e-9 * (1 if dy >= 0 else -1)
 
-        cx, cy = source.x, source.y
+        src_x_tile = source.x / self.tile_size
+        src_y_tile = source.y / self.tile_size
 
-        step_x = 1 if dx > 0 else -1
-        step_y = 1 if dy > 0 else -1
-        
-        # 2. Текущие индексы тайла
-        grid_x = int(cx // self.tile_size)
-        grid_y = int(cy // self.tile_size)
-        
-        delta_dist_x = abs(self.tile_size / dx) if dx != 0 else float('inf')
-        delta_dist_y = abs(self.tile_size / dy) if dy != 0 else float('inf')
-        
+        map_x = int(src_x_tile)
+        map_y = int(src_y_tile)
+
+        delta_dist_x = abs(1 / dx)
+        delta_dist_y = abs(1 / dy)
+
         if dx > 0:
-            side_dist_x = ((grid_x + 1) * self.tile_size - cx) / abs(dx)
+            step_x = 1
+            side_dist_x = (map_x + 1 - src_x_tile) * delta_dist_x
         else:
-            side_dist_x = (cx - grid_x * self.tile_size) / abs(dx) if dx != 0 else float('inf')
+            step_x = -1
+            side_dist_x = (src_x_tile - map_x) * delta_dist_x
             
         if dy > 0:
-            side_dist_y = ((grid_y + 1) * self.tile_size - cy) / abs(dy)
+            step_y = 1
+            side_dist_y = (map_y + 1 - src_y_tile) * delta_dist_y
         else:
-            side_dist_y = (cy - grid_y * self.tile_size) / abs(dy) if dy != 0 else float('inf')
+            step_y = -1
+            side_dist_y = (src_y_tile - map_y) * delta_dist_y
 
-        while True:
-            if not (0 <= grid_x < self.game_map.grid_width and 0 <= grid_y < self.game_map.grid_height):
-                return (cx, cy)
-            
-            if math.hypot(cx - source.x, cy - source.y) < 0.1:
-                # Делаем первый прыжок без проверки стены
-                if side_dist_x < side_dist_y:
-                    side_dist_x += delta_dist_x
-                    grid_x += step_x
-                    cx = grid_x * self.tile_size if step_x > 0 else (grid_x + 1) * self.tile_size
-                else:
-                    side_dist_y += delta_dist_y
-                    grid_y += step_y
-                    cy = grid_y * self.tile_size if step_y > 0 else (grid_y + 1) * self.tile_size
-                continue
-            
-            dist = math.hypot(cx - source.x, cy - source.y)
-            if dist >= source.radius:
-                return (cx, cy)
-            
-            if self.game_map._is_wall(grid_x, grid_y):
-                return (cx, cy)
+        hit = False
+        side = 0 
+
+        max_steps = self.grid_width + self.grid_height
+        steps_taken = 0
+
+        while not hit and steps_taken < max_steps:
+            steps_taken += 1
             
             if side_dist_x < side_dist_y:
                 side_dist_x += delta_dist_x
-                grid_x += step_x
-                cx = grid_x * self.tile_size if step_x > 0 else (grid_x + 1) * self.tile_size
-
+                map_x += step_x
+                side = 0
             else:
                 side_dist_y += delta_dist_y
-                grid_y += step_y
-                cy = grid_y * self.tile_size if step_y > 0 else (grid_y + 1) * self.tile_size
+                map_y += step_y
+                side = 1
+
+            if (map_x < 0 or map_x >= self.grid_width or 
+                map_y < 0 or map_y >= self.grid_height):
+                hit = True
+                break
+
+            if self.game_map.is_wall(map_x, map_y):
+                hit = True
+
+        # Вычисление расстояния
+        if side == 0:
+            perp_wall_dist = side_dist_x - delta_dist_x
+        else:
+            perp_wall_dist = side_dist_y - delta_dist_y
+
+        hit_x = source.x + perp_wall_dist * dx * self.tile_size
+        hit_y = source.y + perp_wall_dist * dy * self.tile_size
+
+        # Ограничение радиусом
+        if math.hypot(hit_x - source.x, hit_y - source.y) > source.radius:
+            hit_x = source.x + dx * source.radius
+            hit_y = source.y + dy * source.radius
+
+        return (hit_x, hit_y)
