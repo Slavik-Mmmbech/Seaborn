@@ -11,6 +11,9 @@ import config.display_config as display
 import config.gameplay_config as gameplay
 import config.generation_config as gen
 from config.logging_config import setup_logger
+from core.managers.collision_manager import CollisionManager
+from core.managers.npc_manager import NPCManager
+from core.managers.items_manager import CollectibleSpawnManager
 from entities.items import Collectible
 from entities.items import Item
 from entities.npc import NPC, NPCType
@@ -57,6 +60,13 @@ class World:
             world_bounds, max_capacity=gen.MAX_CAPACITY, max_depth=gen.MAX_DEPTH
         )
         self.level_complete = False
+        self.walkable_areas = []
+        self.collectibles = []
+        self.npcs = []
+
+        self.collision_manager = CollisionManager(walkable_areas=[]) 
+        self.items_manager = None
+        self.npc_manager = NPCManager(entry_point=(0,0), audio_manager=audio_manager)
 
 
     def _room_to_rect(self, room_data: Tuple[int, int, int, int]) -> pygame.Rect:
@@ -118,6 +128,7 @@ class World:
 
         # Построение геометрии
         self._build_walkable_areas()
+        self.collision_manager.walkable_areas = self.walkable_areas
         self._generate_walls_from_geometry()
         self._build_light_grid()
 
@@ -130,10 +141,30 @@ class World:
             self.exit_rect.inflate_ip(gameplay.NPC_COORD, gameplay.NPC_COORD)
 
         self._assign_room_values()
-        self._spawn_collectibles()
-        self._spawn_npcs()
+        self.items_manager = CollectibleSpawnManager(
+            rooms=self.rooms,
+            room_values=self.room_values
+        )
+        self.collectibles = self.items_manager.spawn_collectibles()
+        self._update_spatial_index()
+        self.npc_manager = NPCManager(
+            entry_point=self.entry_point,
+            audio_manager=self.audio
+        )
+        self.npc_manager.spawn_all_npcs(
+            rooms=[pygame.Rect(*room_data) for room_data in self.rooms],
+            build_lore_chain_func=self._build_lore_chain,
+            create_behavior_tree_func=self._create_npc_behavior_tree_from_factory
+        )
+        self.npcs = self.npc_manager.npcs
         self.level_complete = False
         logger.debug(f"Сгенерированы NPC: {self.npcs}")
+
+    def _create_npc_behavior_tree_from_factory(self, npc: NPC) -> ai.BTNode:
+        """Создаёт дерево поведения через фабрику."""
+        from ai.behavior_tree_factory import NPCBehaviorTreeFactory
+        factory = NPCBehaviorTreeFactory()
+        return factory.create_behavior_tree(npc)
 
     def _build_walkable_areas(self) -> None:
         """Создает список всех проходимых зон (комнаты + коридоры)"""
@@ -161,25 +192,6 @@ class World:
 
             self.walkable_areas.append(corridor_rect)
 
-    def _is_position_valid(self, rect: pygame.Rect) -> bool:
-        """Проверяет, находится ли центр игрока в проходимой зоне"""
-        if not self.walkable_areas:
-            return False
-
-        # Создание точки в центре игрока для проверки
-        center_x = rect.centerx
-        center_y = rect.centery
-        point_rect = pygame.Rect(center_x - gameplay.VALID_DELTA,
-                                 center_y - gameplay.VALID_DELTA,
-                                 gameplay.VALID_SIZE,
-                                 gameplay.VALID_SIZE
-                                 )
-
-        for area in self.walkable_areas:
-            if point_rect.colliderect(area):
-                return True
-        return False
-
     def _update_spatial_index(self) -> None:
         """
         Обновляет пространственный индекс для динамических объектов.
@@ -196,50 +208,6 @@ class World:
                 collectible.rect.height,
             )
             self.spatial_index.insert(collectible, item_bounds)
-
-    def _spawn_collectibles(self) -> None:
-        """Размещает предметы внутри границ комнат с отступом."""
-        if not self.rooms:
-            return
-
-        bag = LootBag()
-        new_collectibles = []
-
-        room_weights = [self.room_values.get(i, 0.0) for i in range(len(self.rooms))]
-
-        if sum(room_weights) == 0:
-            room_weights = [1.0] * len(self.rooms)
-
-        for _ in range(30):
-            rarity = bag.draw()
-
-            rarity_cfg = gameplay.ITEM_RARITY_CONFIG[rarity]
-            min_w, max_w, value_mult, _ = rarity_cfg
-            item = Item(
-                "loot",
-                rarity,
-                random.uniform(min_w, max_w),
-                random.uniform(gameplay.LOW_VALUE,
-                               gameplay.HIGH_VALUE
-                               ) * value_mult,
-            )
-
-            room_data = random.choices(self.rooms, weights=room_weights)[0]
-
-            room = pygame.Rect(*room_data)
-
-            padding = gen.ROOM_OFFSET
-            min_x, max_x = room.left + padding, room.right - padding
-            min_y, max_y = room.top + padding, room.bottom - padding
-
-            safe_x = min_x if max_x <= min_x else random.randint(min_x, max_x)
-            safe_y = min_y if max_y <= min_y else random.randint(min_y, max_y)
-
-            new_collectibles.append(Collectible(safe_x, safe_y, item))
-
-        self.collectibles.extend(new_collectibles)
-        logger.info(f"Предметы были распределены.")
-        self._update_spatial_index()
 
     def _generate_walls_from_geometry(self) -> None:
         """
@@ -307,153 +275,10 @@ class World:
 
         self.raycaster = Raycaster(self.light_grid, display.TILE_SIZE)
 
-    def _spawn_npcs(self) -> None:
-        """Создаёт несколько NPC внутри комнат."""
-        self.npcs = []
-        self.active_storyteller = None
-        self.talk_text = " "
-        self.storyteller_in_range = False
-
-        if not self.rooms:
-            return
-
-        rooms_rects = [pygame.Rect(*room_data) for room_data in self.rooms]
-
-        attacker_rooms = rooms_rects[2:4]
-        escaper_rooms = rooms_rects[4:6]
-        storyteller_rooms = [
-            room
-            for room in rooms_rects[6:]
-            if self._calculate_distance(self.entry_point, room.center) > 240
-        ][:2]
-
-        for idx, room in enumerate(attacker_rooms):
-            spawn_x = room.centerx + random.randint(-20, 20)
-            spawn_y = room.centery + random.randint(-20, 20)
-            lore_chain = self._build_lore_chain()
-            npc = NPC(
-                npc_id=f"attacker_{idx + 1}",
-                start_pos=(spawn_x, spawn_y),
-                bt_root=ai.Action(lambda bb: ai.NodeStatus.SUCCESS),
-                lore_chain=lore_chain,
-                npc_type=NPCType.ATTACKER,
-            )
-            npc.bt_root = self._create_npc_behavior_tree(npc)
-            self.npcs.append(npc)
-
-        for idx, room in enumerate(escaper_rooms):
-            spawn_x = room.centerx + random.randint(-20, 20)
-            spawn_y = room.centery + random.randint(-20, 20)
-            lore_chain = self._build_lore_chain()
-            npc = NPC(
-                npc_id=f"escaper_{idx + 1}",
-                start_pos=(spawn_x, spawn_y),
-                bt_root=ai.Action(lambda bb: ai.NodeStatus.SUCCESS),
-                lore_chain=lore_chain,
-                npc_type=NPCType.ESCAPER,
-            )
-            npc.bt_root = self._create_npc_behavior_tree(npc)
-            self.npcs.append(npc)
-
-        for idx, room in enumerate(storyteller_rooms):
-            spawn_x = room.centerx + random.randint(-20, 20)
-            spawn_y = room.centery + random.randint(-20, 20)
-            lore_chain = self._build_lore_chain()
-            npc = NPC(
-                npc_id=f"storyteller_{idx + 1}",
-                start_pos=(spawn_x, spawn_y),
-                bt_root=ai.Action(lambda bb: ai.NodeStatus.SUCCESS),
-                lore_chain=lore_chain,
-                npc_type=NPCType.STORYTELLER,
-            )
-            dialog_rewards = WeightedBinaryLootGenerator(gameplay.LOOT_REWARDS)
-            npc.dialog_rewards = dialog_rewards
-            npc.bt_root = self._create_npc_behavior_tree(npc)
-            self.npcs.append(npc)
-
-    def get_nearby_storyteller(self):
-        if not self.player:
-            return None
-
-        for npc in self.npcs:
-            if npc.npc_type != NPCType.STORYTELLER:
-                continue
-            distance = self._calculate_distance(self.player.rect.center, npc.position)
-            if distance <= gameplay.NPC_TALK_DISTANCE:
-                return npc
-        return None
-
     def _build_lore_chain(self) -> ai.MarkovChain:
         transitions = content.GAME_TRANSITIONS
         return ai.MarkovChain(transitions)
 
-    def _create_npc_behavior_tree(self, npc: NPC):
-        def check_sees_player(bb):
-            return bb.get("sees_player") is True
-
-        def move_toward_player(bb):
-            if self.player:
-                npc.move_to(self.player.rect.center, max_step=npc.speed)
-                return ai.NodeStatus.RUNNING
-            return ai.NodeStatus.FAILURE
-
-        def move_away_from_player(bb):
-            if self.player:
-                dx = npc.position[0] - self.player.rect.centerx
-                dy = npc.position[1] - self.player.rect.centery
-                distance = math.hypot(dx, dy)
-                if distance < 1e-3:
-                    return ai.NodeStatus.FAILURE
-                target = (
-                    npc.position[0] + dx / distance * npc.speed * 1.2,
-                    npc.position[1] + dy / distance * npc.speed * 1.2,
-                )
-                npc.move_to(target, max_step=npc.speed)
-                return ai.NodeStatus.RUNNING
-            return ai.NodeStatus.FAILURE
-
-        def patrol_action(bb):
-            npc.patrol()
-            return ai.NodeStatus.SUCCESS
-
-        def storyteller_idle(bb):
-            return ai.NodeStatus.SUCCESS
-
-        if npc.npc_type == NPCType.ATTACKER:
-            return ai.Selector(
-                [
-                    ai.Sequence(
-                        [
-                            ai.Condition(check_sees_player),
-                            ai.Action(move_toward_player),
-                        ]
-                    ),
-                    ai.Action(patrol_action),
-                ]
-            )
-
-        if npc.npc_type == NPCType.ESCAPER:
-            return ai.Selector(
-                [
-                    ai.Sequence(
-                        [
-                            ai.Condition(check_sees_player),
-                            ai.Action(move_away_from_player),
-                        ]
-                    ),
-                    ai.Action(patrol_action),
-                ]
-            )
-
-        return ai.Selector(
-            [
-                ai.Action(storyteller_idle),
-            ]
-        )
-
-    # Использование QuadTree снижает сложность поиска пересекающихся объектов
-    # с O(N) до O(log N), что критично для производительности при большом
-    # количестве сущностей на карте.
     def update(self, keys: Any) -> None:
         if not self.player:
             return
@@ -474,7 +299,7 @@ class World:
 
         self.player.handle_input(keys)
 
-        if not self._is_position_valid(self.player.rect):
+        if not self.collision_manager.is_position_valid(self.player.rect):
             self.player.x = old_x
             self.player.y = old_y
             self.player.rect.x = int(old_x)
@@ -522,30 +347,17 @@ class World:
                     else:
                         self.notification_message = "Недостаточно места в инвентаре!"
                         self.notification_time = gameplay.NOTIF_TIME
+
         if collected_this_frame:
             for c in collected_this_frame:
                 if c in self.collectibles:
                     self.collectibles.remove(c)
             self._update_spatial_index()
 
-        self.storyteller_in_range = False
+        self.npc_manager.update_npc_visibility(self.player)
+        self.storyteller_in_range = (
+            self.npc_manager.get_nearby_storyteller(self.player) is not None
+        )
+
         for npc in self.npcs:
-            if self.player:
-                distance = self._calculate_distance(
-                    npc.position,
-                    self.player.rect.center,
-                )
-                if npc.npc_type == NPCType.ATTACKER:
-                    npc.blackboard.set(
-                        "sees_player", distance <= gameplay.NPC_SEE_DISTANCE
-                    )
-                elif npc.npc_type == NPCType.ESCAPER:
-                    npc.blackboard.set(
-                        "sees_player", distance <= gameplay.NPC_SEE_DISTANCE
-                    )
-                elif npc.npc_type == NPCType.STORYTELLER:
-                    can_talk = distance <= gameplay.NPC_TALK_DISTANCE
-                    npc.blackboard.set("sees_player", can_talk)
-                    if can_talk:
-                        self.storyteller_in_range = True
-            npc.update()
+            npc.update(self.player)

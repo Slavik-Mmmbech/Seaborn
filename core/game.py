@@ -2,7 +2,7 @@ import pygame
 import random
 
 from entities.items import Item
-from core.audio_manager import AudioManager
+from core.managers.audio_manager import AudioManager
 from config.audio_config import SoundKeys
 import config.display_config as display
 import config.gameplay_config as gameplay
@@ -93,7 +93,7 @@ class Game:
                             self.world.active_storyteller = None
                             self.world.talk_text = ""
                         else:
-                            storyteller = self.world.get_nearby_storyteller()
+                            storyteller = self.world.npc_manager.get_nearby_storyteller(self.world.player)
                             if storyteller:
                                 self.audio_manager.play_sfx(SoundKeys.TALK)  
                                 self.world.active_storyteller = storyteller
